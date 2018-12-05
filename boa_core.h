@@ -5,6 +5,7 @@
 #include <stdint.h>
 
 #define boa_arraycount(arr) (sizeof(arr) / sizeof(*(arr)))
+#define boa_arrayend(arr) (arr + (sizeof(arr) / sizeof(*(arr))))
 
 typedef struct boa_buf {
 	void *buf_ptr, *ptr;
@@ -79,6 +80,7 @@ static inline void *boa_vec_push(boa_vec *vec, size_t size) {
 #define boa_vcount(type, vec) ((vec).byte_pos / sizeof(type))
 #define boa_vbegin(type, vec) ((type*)((vec).buf.ptr))
 #define boa_vend(type, vec) (type*)((char*)(vec).buf.ptr + (vec).byte_pos)
+#define boa_vcap(type, vec) (type*)((char*)(vec).buf.ptr + (vec).buf.cap)
 #define boa_vbytesleft(vec) ((vec).buf.cap - (vec).byte_pos)
 
 static inline boa_vec_reset(boa_vec *vec)
@@ -109,6 +111,8 @@ void *boa__internal_buf_alloc(boa_buf *buf, size_t size) {
 	char *ptr;
 	if (size < buf->cap * 2)
 		size = buf->cap * 2;
+	if (size < 16)
+		size = 16;
 
 	ptr = boa_malloc(size);
 
@@ -129,6 +133,8 @@ void *boa__internal_buf_realloc(boa_buf *buf, size_t size) {
 	char *ptr;
 	if (size < buf->cap * 2)
 		size = buf->cap * 2;
+	if (size < 16)
+		size = 16;
 
 	if (buf->ptr != buf->buf_ptr) {
 		ptr = boa_try_realloc(buf->ptr, size);

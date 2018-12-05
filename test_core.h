@@ -397,7 +397,18 @@ BOA_TEST(format_vec_stack, "Appending format() works to a stack vector")
 	boa_expectf(strcmp(boa_vbegin(char, vec), "ABCDEFG") == 0,
 			"vec = %s", boa_vbegin(char, vec));
 	boa_expect(vec.byte_pos == 7);
-	boa_expect(vec.buf.cap == 8);
 	boa_vec_reset(&vec);
+}
+
+BOA_TEST(arraycount, "boa_arraycount() should return the number of elements in array")
+{
+	int arr[16];
+	boa_expect(boa_arraycount(arr) == 16);
+}
+
+BOA_TEST(arrayend, "boa_arrayend() should return pointer past the last element")
+{
+	int arr[16];
+	boa_expect(boa_arrayend(arr) == arr + 16);
 }
 
