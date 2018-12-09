@@ -5,6 +5,7 @@
 
 int main()
 {
+	auto buf = boa::empty_buf_default<char>();
 	const char *str = boa::format(buf, "Hello %s!", "World");
 	puts(str);
 }
