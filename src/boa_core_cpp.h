@@ -32,7 +32,7 @@ static inline allocator *boa_default_ator()
 
 template <typename T>
 struct buf: boa_buf {
-	static_assert(std::is_trivially_destructible<T>::value, "boa::buf doesn't run descturors, use boa::obj_buf instead");
+	static_assert(std::is_trivially_destructible<T>::value, "boa::buf doesn't run destructors, use boa::obj_buf instead");
 
 	buf() { }
 	~buf() { reset(); }
