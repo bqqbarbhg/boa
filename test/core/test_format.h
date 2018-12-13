@@ -37,7 +37,7 @@ BOA_TEST(format_stack_overflow, "Format should allocate when overflowing")
 	boa_buf buf = boa_array_buf(data);
 	char *str = boa_format(&buf, "abcd");
 	boa_assert(str != data);
-	boa_assert(strcmp(buf.data, "abcd") == 0);
+	boa_assert(strcmp((char*)buf.data, "abcd") == 0);
 	boa_assert(buf.end_pos == 4);
 	boa_reset(&buf);
 }

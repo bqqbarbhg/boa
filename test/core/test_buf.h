@@ -371,6 +371,16 @@ BOA_TEST(buf_set_ator_fail, "Setting allocator should fail gracefully")
 	boa_assert(ator.frees == 0);
 }
 
+BOA_TEST(buf_get, "Buf get should return bounds checked pointer")
+{
+	boa_buf buf = boa_empty_buf();
+	boa_assert(boa_buf_push(&buf, 16) != NULL);
+	boa_assert(boa_buf_get(&buf, 8, 8) == (char*)buf.data + 8);
+	boa_expect_assert( boa_buf_get(&buf, 8, 16) );
+	boa_expect_assert( boa_buf_get(&buf, 16, 8) );
+	boa_reset(&buf);
+}
+
 BOA_TEST(buf_shorthands_simple, "Simple buffer shorthand test")
 {
 	int arr[2];
@@ -455,5 +465,22 @@ BOA_TEST(buf_shorthand_view, "Shorthands for views")
 	boa_assert(buf_equal(&manual, &slice));
 	boa_assert(buf_equal(&manual, &bytes));
 	boa_assert(buf_equal(&manual, &array));
+}
+
+BOA_TEST(buf_shorthand_get, "Shorthand for get")
+{
+	boa_buf buf = boa_empty_buf();
+	boa_push_val(int, &buf, 10);
+	boa_push_val(int, &buf, 20);
+
+	boa_assert(boa_get(int, &buf, 0) == 10);
+	boa_assert(boa_get(int, &buf, 1) == 20);
+	boa_assert(boa_get_n(int, &buf, 0, 2) == (int*)buf.data);
+
+	boa_expect_assert( boa_get(int, &buf, 2) );
+	boa_expect_assert( boa_get(int, &buf, 2) );
+	boa_expect_assert( boa_get_n(int, &buf, 0, 3) );
+
+	boa_reset(&buf);
 }
 

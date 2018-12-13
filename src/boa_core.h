@@ -134,6 +134,12 @@ boa_inline boa_allocator *boa_buf_ator(boa_buf *buf)
 	return (boa_allocator*)(buf->ator_flags & ~(uintptr_t)BOA_BUF_FLAG_MASK);
 }
 
+boa_inline void *boa_buf_get(boa_buf *buf, uint32_t offset, uint32_t size)
+{
+	boa_assert(offset + size <= buf->end_pos);
+	return (char*)buf->data + offset;
+}
+
 int boa_buf_set_ator(boa_buf *buf, boa_allocator *ator);
 
 void *boa_buf_insert(boa_buf *buf, uint32_t pos, uint32_t size);
@@ -172,6 +178,9 @@ char *boa_format(boa_buf *buf, const char *fmt, ...);
 
 #define boa_push_val(type, buf, val) (*(type*)boa_check_ptr(boa_push(type, buf)) = (val))
 #define boa_insert_val(type, buf, pos, val) (*(type*)boa_check_ptr(boa_insert(type, buf, pos)) = (val))
+
+#define boa_get(type, buf, pos) (*(type*)boa_buf_get((buf), (pos) * sizeof(type), sizeof(type)))
+#define boa_get_n(type, buf, pos, n) ((type*)boa_buf_get((buf), (pos) * sizeof(type), (n) * sizeof(type)))
 
 #define boa_bytesleft(buf) ((buf)->cap_pos - (buf)->end_pos)
 
