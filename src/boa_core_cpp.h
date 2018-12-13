@@ -68,6 +68,8 @@ struct buf: boa_buf {
 	void bump_n(uint32_t count) { return boa_bump_n(T, this, count); }
 	T *insert_n(uint32_t pos, uint32_t count) { return boa_insert_n(T, this, pos, count); }
 
+	void remove(uint32_t pos) { boa_remove(T, this, pos); }
+
 	T &operator[](uint32_t index) { return boa_get(T, this, index); }
 	const T &operator[](uint32_t index) const { return boa_get(const T, this, index); }
 

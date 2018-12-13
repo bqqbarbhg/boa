@@ -371,6 +371,50 @@ BOA_TEST(buf_set_ator_fail, "Setting allocator should fail gracefully")
 	boa_assert(ator.frees == 0);
 }
 
+BOA_TEST(buf_remove, "Remove should swap out the last element")
+{
+	boa_buf buf = boa_empty_buf();
+	int *data = (int*)boa_buf_push(&buf, 4 * sizeof(int));
+	data[0] = 10; data[1] = 20; data[2] = 30; data[3] = 40;
+
+	boa_buf_remove(&buf, 3 * sizeof(int), sizeof(int));
+	boa_assert(buf.end_pos == 3 * sizeof(int));
+	boa_assert(data[0] == 10 && data[1] == 20 && data[2] == 30);
+	boa_assert(data[3] == 40);
+
+	boa_buf_remove(&buf, 0, sizeof(int));
+	boa_assert(data[0] == 30 && data[1] == 20);
+
+	boa_reset(&buf);
+}
+
+BOA_TEST(buf_remove_single, "Remove should work on single element")
+{
+	boa_buf buf = boa_empty_buf();
+	int *data = (int*)boa_buf_push(&buf, 2 * sizeof(int));
+	data[0] = 10;
+	data[1] = 20;
+
+	boa_buf_remove(&buf, 0, sizeof(int));
+	boa_assert(data[0] == 20);
+	boa_assert(buf.end_pos == sizeof(int));
+	boa_buf_remove(&buf, 0, sizeof(int));
+	boa_assert(buf.end_pos == 0);
+
+	boa_reset(&buf);
+}
+
+BOA_TEST(buf_remove_assert, "Remove should assert when out of bounds or invalid")
+{
+	boa_buf buf = boa_empty_buf();
+	boa_assert(boa_buf_push(&buf, 4 * sizeof(int)) != NULL);
+
+	boa_expect_assert( boa_buf_remove(&buf, 4 * sizeof(int), sizeof(int)) );
+	boa_expect_assert( boa_buf_remove(&buf, 3 * sizeof(int) - 2, sizeof(int)) );
+
+	boa_reset(&buf);
+}
+
 BOA_TEST(buf_get, "Buf get should return bounds checked pointer")
 {
 	boa_buf buf = boa_empty_buf();
@@ -480,6 +524,19 @@ BOA_TEST(buf_shorthand_get, "Shorthand for get")
 	boa_expect_assert( boa_get(int, &buf, 2) );
 	boa_expect_assert( boa_get(int, &buf, 2) );
 	boa_expect_assert( boa_get_n(int, &buf, 0, 3) );
+
+	boa_reset(&buf);
+}
+
+BOA_TEST(buf_shorthand_remove, "Shorthand for remove")
+{
+	boa_buf buf = boa_empty_buf();
+	boa_push_val(int, &buf, 10);
+	boa_push_val(int, &buf, 20);
+
+	boa_remove(int, &buf, 0);
+
+	boa_assert(boa_get(int, &buf, 0) == 20);
 
 	boa_reset(&buf);
 }

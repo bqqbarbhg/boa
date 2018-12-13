@@ -7,6 +7,7 @@
 
 #include <stdint.h>
 #include <stddef.h>
+#include <string.h>
 
 #define boa_arraycount(arr) (sizeof(arr) / sizeof(*(arr)))
 #define boa_arrayend(arr) (arr + (sizeof(arr) / sizeof(*(arr))))
@@ -140,6 +141,18 @@ boa_inline void *boa_buf_get(boa_buf *buf, uint32_t offset, uint32_t size)
 	return (char*)buf->data + offset;
 }
 
+boa_inline void boa_buf_remove(boa_buf *buf, uint32_t offset, uint32_t size)
+{
+	char *data = (char*)buf->data;
+	uint32_t end_pos = buf->end_pos;
+	boa_assert(offset + size <= end_pos);
+	boa_assert(offset == end_pos - size || offset + size <= end_pos - size);
+	if (offset + size < end_pos) {
+		memcpy(data + offset, data + end_pos - size, size);
+	}
+	buf->end_pos = end_pos - size;
+}
+
 int boa_buf_set_ator(boa_buf *buf, boa_allocator *ator);
 
 void *boa_buf_insert(boa_buf *buf, uint32_t pos, uint32_t size);
@@ -178,6 +191,8 @@ char *boa_format(boa_buf *buf, const char *fmt, ...);
 
 #define boa_push_val(type, buf, val) (*(type*)boa_check_ptr(boa_push(type, buf)) = (val))
 #define boa_insert_val(type, buf, pos, val) (*(type*)boa_check_ptr(boa_insert(type, buf, pos)) = (val))
+
+#define boa_remove(type, buf, pos) boa_buf_remove((buf), (pos) * sizeof(type), sizeof(type))
 
 #define boa_get(type, buf, pos) (*(type*)boa_buf_get((buf), (pos) * sizeof(type), sizeof(type)))
 #define boa_get_n(type, buf, pos, n) ((type*)boa_buf_get((buf), (pos) * sizeof(type), (n) * sizeof(type)))
