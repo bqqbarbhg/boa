@@ -70,6 +70,9 @@ struct buf: boa_buf {
 
 	void remove(uint32_t pos) { boa_remove(T, this, pos); }
 
+	void erase(uint32_t pos) { boa_erase(T, this, pos); }
+	void erase_n(uint32_t pos, uint32_t count) { boa_erase_n(T, this, pos, count); }
+
 	T &operator[](uint32_t index) { return boa_get(T, this, index); }
 	const T &operator[](uint32_t index) const { return boa_get(const T, this, index); }
 

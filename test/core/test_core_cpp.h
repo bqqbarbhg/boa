@@ -40,7 +40,7 @@ BOA_TEST(cpp_buf_basic, "Simple boa::buf<int> test")
 	boa_assert(buf.count() == 4);
 
 	buf.remove(1);
-	buf.remove(2);
+	buf.erase(2);
 
 	boa_assert(buf[0] == 10);
 	boa_assert(buf[1] == 40);

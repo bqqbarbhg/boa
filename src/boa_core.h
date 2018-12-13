@@ -153,6 +153,19 @@ boa_inline void boa_buf_remove(boa_buf *buf, uint32_t offset, uint32_t size)
 	buf->end_pos = end_pos - size;
 }
 
+boa_inline void boa_buf_erase(boa_buf *buf, uint32_t offset, uint32_t size)
+{
+	char *data = (char*)buf->data;
+	uint32_t end_pos = buf->end_pos;
+	boa_assert(offset + size <= end_pos);
+	uint32_t end = offset + size;
+	uint32_t shift = end_pos - end;
+	if (shift > 0) {
+		memmove(data + offset, data + end, shift);
+	}
+	buf->end_pos = end_pos - size;
+}
+
 int boa_buf_set_ator(boa_buf *buf, boa_allocator *ator);
 
 void *boa_buf_insert(boa_buf *buf, uint32_t pos, uint32_t size);
@@ -193,6 +206,8 @@ char *boa_format(boa_buf *buf, const char *fmt, ...);
 #define boa_insert_val(type, buf, pos, val) (*(type*)boa_check_ptr(boa_insert(type, buf, pos)) = (val))
 
 #define boa_remove(type, buf, pos) boa_buf_remove((buf), (pos) * sizeof(type), sizeof(type))
+#define boa_erase(type, buf, pos) boa_buf_erase((buf), (pos) * sizeof(type), sizeof(type))
+#define boa_erase_n(type, buf, pos, n) boa_buf_erase((buf), (pos) * sizeof(type), (n) * sizeof(type))
 
 #define boa_get(type, buf, pos) (*(type*)boa_buf_get((buf), (pos) * sizeof(type), sizeof(type)))
 #define boa_get_n(type, buf, pos, n) ((type*)boa_buf_get((buf), (pos) * sizeof(type), (n) * sizeof(type)))
