@@ -214,4 +214,14 @@ char *boa_format(boa_buf *buf, const char *fmt, ...);
 
 #define boa_bytesleft(buf) ((buf)->cap_pos - (buf)->end_pos)
 
+// -- boa_map
+
+typedef struct boa_map {
+} boa_map;
+
+boa_inline int boa_map_copy(boa_map *dst, boa_map *src);
+boa_inline uint32_t boa_map_find_slot(boa_map *map, uint32_t hash, const void *key, int (*cmp)(const void *a, const void *b));
+boa_inline uint32_t boa_map_make_slot(boa_map *map, uint32_t hash, const void *key, int (*cmp)(const void *a, const void *b));
+boa_inline void boa_map_remove_slot(boa_map *map, uint32_t slot);
+
 #endif
