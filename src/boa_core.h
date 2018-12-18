@@ -9,6 +9,8 @@
 #include <stddef.h>
 #include <string.h>
 
+#include <intrin.h>
+
 #define boa_arraycount(arr) (sizeof(arr) / sizeof(*(arr)))
 #define boa_arrayend(arr) (arr + (sizeof(arr) / sizeof(*(arr))))
 
@@ -216,13 +218,281 @@ char *boa_format(boa_buf *buf, const char *fmt, ...);
 
 // -- boa_map
 
+#if 0
+
 typedef struct boa_map {
+	void *data;
+	uint32_t size;
+	uint32_t kv_size;
+	uint32_t chunk_size;
 } boa_map;
 
-int boa_map_copy(boa_map *dst, boa_map *src);
-void boa_map_remove_slot(boa_map *map, uint32_t slot);
+typedef struct boa__map_chunk {
+	uint32_t link;
+	uint32_t next_present;
+} boa__map_chunk;
 
-boa_inline uint32_t boa_map_find_slot_inline(boa_map *map, uint32_t hash, const void *key, int (*cmp)(const void *a, const void *b));
-boa_inline uint32_t boa_map_make_slot_inline(boa_map *map, uint32_t hash, const void *key, int (*cmp)(const void *a, const void *b));
+boa_inline uint32_t boa__chunk_present(boa__map_chunk *chunk, uint32_t slot)
+{
+	return (chunk->next_present >> slot) & 1;
+}
+
+boa_inline uint32_t boa__chunk_link(boa__map_chunk *chunk, uint32_t slot)
+{
+	return chunk->link >> (slot * 4) & 0xf;
+}
+
+boa_inline void boa__chunk_set_link(boa__map_chunk *chunk, uint32_t slot, uint32_t link)
+{
+	chunk->link = (chunk->link & ~(0xf << slot)) | (link << slot);
+}
+
+boa_inline uint32_t boa__chunk_next_index(boa__map_chunk *chunk)
+{
+	return chunk->next_present >> 8;
+}
+
+boa_inline void *boa_map_insert(boa_map *map, const void *key, uint32_t hash, int (*cmp)(const void *a, const void *b))
+{
+	uint32_t mask = map->size - 1;
+	uint32_t index = hash & mask;
+
+	uint32_t chunk_ix = index / 8;
+	uint32_t slot_ix = index % 8;
+
+	boa__map_chunk *chunk = (boa__map_chunk*)((char*)map->data + chunk_ix * map->chunk_size);
+	char *kv_base = (char*)(chunk + 1);
+
+	void *kv = kv_base + slot_ix * map->kv_size;
+	uint32_t present = boa__chunk_present(chunk, slot_ix);
+
+	if (cmp(key, kv) && present) {
+		return NULL;
+	} else if (!present) {
+		return kv;
+	} else {
+		for (;;) {
+			uint32_t link = boa__chunk_link(chunk, slot_ix);
+			if (link == slot_ix) {
+				uint32_t free = ~(chunk->next_present & 0xff);
+				if (free) {
+					uint32_t ix = boa_find_and_clear_bit(&free);
+					chunk->next_present = (chunk->next_present & ~0xFF) | (~free & 0xFF);
+					boa__chunk_set_link(chunk, slot_ix, ix);
+					return kv_base + ix * map->kv_size;
+				} else {
+				}
+			}
+
+			slot_ix = link & 7;
+			if (link >= 8) {
+				chunk_ix = boa__chunk_next_index(chunk);
+				chunk = (boa__map_chunk*)((char*)map->data + chunk_ix * map->chunk_size);
+				kv_base = (char*)(chunk + 1);
+			}
+			kv = kv_base + slot_ix * map->kv_size;
+			if (cmp(key, kv)) {
+				return NULL;
+			}
+		}
+	}
+}
+
+boa_inline void *boa_map_find(boa_map *map, const void *key, uint32_t hash, int (*cmp)(const void *a, const void *b))
+{
+	uint32_t mask = map->size - 1;
+	uint32_t index = hash & mask;
+
+	uint32_t chunk_ix = index / 8;
+	uint32_t slot_ix = index % 8;
+
+	boa__map_chunk *chunk = (boa__map_chunk*)((char*)map->data + chunk_ix * map->chunk_size);
+	char *kv_base = (char*)(chunk + 1);
+
+	void *kv = kv_base + slot_ix * map->kv_size;
+	uint32_t present = boa__chunk_present(chunk, slot_ix);
+
+	if (cmp(key, kv) && present) {
+		return kv;
+	} else if (!present) {
+		return NULL;
+	} else {
+		for (;;) {
+			uint32_t link = boa__chunk_link(chunk, slot_ix);
+			if (link == slot_ix) return NULL;
+
+			slot_ix = link & 7;
+			if (link >= 8) {
+				chunk_ix = boa__chunk_next_index(chunk);
+				chunk = (boa__map_chunk*)((char*)map->data + chunk_ix * map->chunk_size);
+				kv_base = (char*)(chunk + 1);
+			}
+			kv = kv_base + slot_ix * map->kv_size;
+			if (cmp(key, kv)) {
+				return kv;
+			}
+		}
+	}
+}
+
+boa_inline void *boa_map_erase(boa_map *map, uint32_t index, uint32_t hash)
+{
+	uint32_t chunk_ix = index / 8;
+	uint32_t slot_ix = index % 8;
+
+	boa__map_chunk *chunk = (boa__map_chunk*)((char*)map->data + chunk_ix * map->chunk_size);
+	char *kv_base = (char*)(chunk + 1);
+
+	boa_assert(boa__chunk_present(chunk, slot_ix));
+
+}
+
+#endif
+
+enum boa__map_color {
+	boa__map_empty = 0, // < The node is not in use in any way
+	boa__map_black = 1, // < The node is a part of an intra-chunk linked list
+	boa__map_white = 2, // < The node is the head of an intra-chunk linked list
+};
+
+typedef struct boa_map {
+	void *data;
+	uint32_t size;
+	uint32_t kv_size;
+	uint32_t chunk_size;
+	uint32_t aux_chunk_begin;
+	uint32_t num_aux;
+} boa_map;
+
+typedef struct boa__map_chunk {
+	uint32_t link;
+	uint16_t color;
+	uint16_t next;
+} boa__map_chunk;
+
+#define boa_map_assert(x) (void)0
+
+// Find any set bit in `*mask`.
+static inline uint32_t boa_find_bit(uint32_t mask)
+{
+	unsigned long index;
+	_BitScanForward(&index, mask);
+	return index;
+}
+
+boa_inline uint32_t boa_mask_nibbles_to_msb(uint32_t mask)
+{
+    // 0x8 for bytes with bit 4 set, 0x00 otherwise
+    uint32_t high_bits = mask & 0x88888888;
+    // 0x8 for bytes with bits 1-3 set, 0x00 otherwise
+    uint32_t all_low_bits = (mask & ~0x88888888) + 0x11111111;
+    // 0x8 for bytes with all bits set
+    return high_bits & all_low_bits;
+}
+
+boa_inline boa__map_color boa__map_get_color(boa__map_chunk *chunk, uint32_t slot)
+{
+	boa_map_assert(slot < 8);
+	uint32_t col = (chunk->color >> (slot * 2)) & 3;
+	boa_map_assert(col != 3);
+	return (boa__map_color)col;
+}
+
+// Retrieve the next node this one is linked to
+boa_inline uint32_t boa__map_get_link(boa__map_chunk *chunk, uint32_t slot)
+{
+	boa_map_assert(slot < 8);
+	boa_map_assert(boa__map_get_color(chunk, slot) != boa__map_empty);
+	uint32_t link = (chunk->link >> (slot * 4)) & 0x7;
+	return link;
+}
+
+// Change the node this one is linked to
+boa_inline void boa__map_set_link(boa__map_chunk *chunk, uint32_t slot, uint32_t link)
+{
+	boa_map_assert(slot < 8);
+	boa_map_assert(boa__map_get_color(chunk, slot) != boa__map_empty);
+	chunk->link = chunk->link & ~(0xfu << 4u * slot) | (link << 4u * slot);
+}
+
+boa_inline void boa__map_init_node(boa__map_chunk *chunk, uint32_t slot, boa__map_color color)
+{
+	boa_map_assert(slot < 8);
+	chunk->color = chunk->color & ~(0x3 << (slot * 2)) | ((uint32_t)color << (slot * 2));
+	boa__map_set_link(chunk, slot, slot);
+}
+
+// Retrieve the previous node in this chunk leading to this node.
+boa_inline uint32_t boa__map_get_prev(boa__map_chunk *chunk, uint32_t slot)
+{
+	boa_map_assert(slot < 8);
+	boa_map_assert(boa__map_get_color(chunk, slot) == boa__map_black);
+	uint32_t eq_mask = (chunk->link ^ (slot * 0x11111111)) | (0x1 << slot * 4);
+	uint32_t eq_bits = boa_mask_nibbles_to_msb(~eq_mask) >> 3;
+	boa_map_assert(eq_bits != 0);
+	boa_map_assert((eq_bits & eq_bits - 1) == 0);
+	uint32_t eq_ix = boa_find_bit(eq_bits);
+	return eq_ix;
+}
+
+boa_inline boa__map_chunk *boa__map_next_chunk(boa_map *map, boa__map_chunk *chunk)
+{
+	uint32_t offset = map->aux_chunk_begin + chunk->next * map->chunk_size;
+	return (boa__map_chunk*)((char*)map->data + offset);
+}
+
+boa_inline uint32_t boa__map_empty_mask(boa_map *map, boa__map_chunk *chunk)
+{
+	return ~((uint32_t)chunk->color + 0x5555) & 0xaaaa;
+}
+
+boa_inline uint32_t boa__map_non_white_mask(boa_map *map, boa__map_chunk *chunk)
+{
+	return ~((uint32_t)chunk->color) & 0xaaaa;
+}
+
+boa_inline void *boa__map_get_kv(boa_map *map, boa__map_chunk *chunk, uint32_t slot)
+{
+	return (char*)(chunk + 1) + slot * map->kv_size;
+}
+
+void *boa__map_create(boa_map *map, boa__map_chunk *chunk, uint32_t slot);
+void boa__map_unlink_and_insert(boa_map *map, boa__map_chunk *chunk, uint32_t slot);
+
+boa_inline void *boa_map_insert(boa_map *map, const void *key, uint32_t hash, int (*cmp)(const void *a, const void *b))
+{
+	uint32_t mask = map->size - 1;
+	uint32_t index = hash & mask;
+
+	uint32_t chunk_ix = index / 8;
+	uint32_t slot = index % 8;
+
+	boa__map_chunk *chunk = (boa__map_chunk*)((char*)map->data + chunk_ix * map->chunk_size);
+
+	for (;;) {
+		boa__map_color color = boa__map_get_color(chunk, slot);
+		void *kv = boa__map_get_kv(map, chunk, slot);
+
+		if (cmp(key, kv) && color == boa__map_white) {
+			return NULL;
+		} else if (color == boa__map_empty) {
+			boa__map_init_node(chunk, slot, boa__map_white);
+			return kv;
+		} else if (color == boa__map_black) {
+			boa__map_unlink_and_insert(map, chunk, slot);
+			return kv;
+		} else {
+			for (;;) {
+				uint32_t link = boa__map_get_link(chunk, slot);
+				if (link == slot) {
+					return boa__map_create(map, chunk, slot);
+				} else if (link >= 8) {
+					chunk = boa__map_next_chunk(map, chunk);
+					slot -= 8;
+				}
+			}
+		}
+	}
+}
 
 #endif

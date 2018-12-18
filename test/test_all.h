@@ -7,6 +7,7 @@
 #include "core/test_allocator.h"
 #include "core/test_buf.h"
 #include "core/test_format.h"
+#include "core/test_map.h"
 
 #ifdef __cplusplus
 #include "core/test_core_cpp.h"

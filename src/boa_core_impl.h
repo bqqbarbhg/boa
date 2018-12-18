@@ -205,4 +205,94 @@ char *boa_format(boa_buf *buf, const char *fmt, ...)
 	return ptr;
 }
 
+void boa__map_unlink_and_insert(boa_map *map, boa__map_chunk *chunk, uint32_t slot);
+
+boa__map_chunk *boa__map_make_next_chunk(boa_map *map, boa__map_chunk *chunk)
+{
+	if (chunk->next == 0) {
+		map->num_aux++;
+		chunk->next = map->num_aux;
+	}
+	return boa__map_next_chunk(map, chunk);
+}
+
+// Create a new node coming to the chunk
+uint32_t boa__map_create_white(boa_map *map, boa__map_chunk *chunk, void **kv)
+{
+	uint32_t ix;
+	uint32_t free = boa__map_empty_mask(map, chunk);
+	if (free) {
+		ix = boa_find_bit(free) / 2;
+		boa__map_init_node(chunk, ix, boa__map_white);
+	} else {
+		free = boa__map_non_white_mask(map, chunk);
+		boa_map_assert(free != 0);
+		ix = boa_find_bit(free) / 2;
+		boa__map_unlink_and_insert(map, chunk, ix);
+	}
+
+	*kv = boa__map_get_kv(map, chunk, ix);
+
+	return ix;
+}
+
+// Create a new node and add it after `slot`
+void *boa__map_create(boa_map *map, boa__map_chunk *chunk, uint32_t slot)
+{
+	void *kv;
+	uint32_t free = boa__map_empty_mask(map, chunk);
+	if (free) {
+		uint32_t ix = boa_find_bit(free) / 2;
+		boa__map_set_link(chunk, slot, ix);
+		boa__map_init_node(chunk, ix, boa__map_black);
+		kv = boa__map_get_kv(map, chunk, ix);
+	} else {
+		boa__map_chunk *nextc = boa__map_make_next_chunk(map, chunk);
+		uint32_t ix = boa__map_create_white(map, nextc, &kv) | 8;
+		boa__map_set_link(chunk, slot, ix);
+	}
+	return kv;
+}
+
+// Follow the linked list from this node to end and insert this node to the end
+// Note: Supports resolving links to next chunks for `slot`
+void *boa__map_insert(boa_map *map, boa__map_chunk *chunk, uint32_t slot)
+{
+	if (slot >= 8) {
+		chunk = boa__map_next_chunk(map, chunk);
+		slot -= 8;
+	}
+
+	for (;;) {
+		uint32_t link = boa__map_get_link(chunk, slot);
+		if (link == slot) {
+			return boa__map_create(map, chunk, slot);
+		} else if (link >= 8) {
+			chunk = boa__map_next_chunk(map, chunk);
+			slot -= 8;
+		}
+	}
+}
+
+// Override a black node with a white one. Replace the intra-chunk link coming to
+// this node with the black node's link and re-insert into the previous node.
+void boa__map_unlink_and_insert(boa_map *map, boa__map_chunk *chunk, uint32_t slot)
+{
+	uint32_t prev = boa__map_get_prev(chunk, slot);
+	uint32_t link = boa__map_get_link(chunk, slot);
+	uint32_t next;
+	if (link != slot) {
+		next = link;
+	} else {
+		next = prev;
+	}
+	boa__map_set_link(chunk, prev, next);
+
+	boa__map_init_node(chunk, slot, boa__map_white);
+
+	void *dst = boa__map_insert(map, chunk, next);
+	void *src = boa__map_get_kv(map, chunk, slot);
+	memcpy(dst, src, map->kv_size);
+}
+
 #endif
