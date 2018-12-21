@@ -12,8 +12,8 @@
 
 // -- boa_allocator
 
-#ifndef BOA_MALLOC
-	#define BOA_MALLOC malloc
+#ifndef BOA_ALLOC
+	#define BOA_ALLOC malloc
 #endif
 
 #ifndef BOA_REALLOC
@@ -24,11 +24,11 @@
 	#define BOA_FREE free
 #endif
 
-void *boa_alloc(size_t size) { return BOA_MALLOC(size); }
+void *boa_alloc(size_t size) { return BOA_ALLOC(size); }
 void *boa_realloc(void *ptr, size_t size) { return BOA_REALLOC(ptr, size); }
 void boa_free(void *ptr) { BOA_FREE(ptr); }
 
-static void *boa__heap_alloc(boa_allocator *ator, size_t size) { return BOA_MALLOC(size); }
+static void *boa__heap_alloc(boa_allocator *ator, size_t size) { return BOA_ALLOC(size); }
 static void *boa__heap_realloc(boa_allocator *ator, void *ptr, size_t size) { return BOA_REALLOC(ptr, size); }
 static void boa__heap_free(boa_allocator *ator, void *ptr) { BOA_FREE(ptr); }
 
@@ -205,7 +205,7 @@ char *boa_format(boa_buf *buf, const char *fmt, ...)
 	return ptr;
 }
 
-static void boa__map_insert_no_find(boa_map *map, uint32_t hash)
+static void boa__map_insert_no_find(boa_map *map, uint32_t hash, const void *data)
 {
 	// Calculate block and slot indices from the hash
 	uint32_t block_mask = map->num_hash_blocks - 1;
@@ -222,24 +222,23 @@ static void boa__map_insert_no_find(boa_map *map, uint32_t hash)
 		count = map->blocks[block_ix].count;
 	}
 
-	uint16_t to_insert = (uint16_t)((count << BOA__MAP_LOWBITS) | (slot_ix & BOA__MAP_LOWMASK));
-
 	uint16_t *element_slot = map->element_slot + block_ix * map->block_num_slots;
 	uint32_t scan = 0;
-	uint32_t result;
+	uint16_t to_insert;
 
 	for (;;) {
 		uint32_t es = element_slot[slot_ix];
-		uint32_t diff = es - slot_ix;
 
 		// If we find an empty slot or one with lower scan distance insert here
-		uint32_t ref_scan = diff & slot_mask;
+		uint32_t ref_scan = (slot_ix - es) & slot_mask;
 		if (es == 0xFFFF || ref_scan < scan) {
-			uint32_t element_offset = es >> BOA__MAP_LOWBITS;
-			result = block_ix * map->block_num_elements + element_offset;
-			element_slot[slot_ix] = to_insert;
+			uint32_t result = block_ix * map->block_num_elements + count;
+			element_slot[slot_ix] = count << BOA__MAP_LOWBITS | (hash & BOA__MAP_LOWMASK);
 			to_insert = es;
 			map->blocks[block_ix].count = count + 1;
+
+			void *dst = (char*)map->data_blocks + result * map->kv_size;
+			memcpy(dst, data, map->kv_size);
 			break;
 		}
 
@@ -304,14 +303,13 @@ int boa__map_rehash(boa_map *map)
 	uint32_t max_align = map->key_size | map->val_size;
 	uint32_t kv_align = max_align >= 8 ? 8 : 4;
 
-	new_map.val_offset = boa_align_up(new_map.key_size, kv_align);
-	new_map.kv_size = boa_align_up(new_map.val_offset + map->val_size, kv_align);
-
 	if (map->capacity == 0) {
 		new_map.num_hash_blocks = 1;
 		num_aux = 0;
 		new_map.block_num_slots = 32;
 		new_map.block_element_bits = 4; // 16
+		new_map.val_offset = boa_align_up(new_map.key_size, kv_align);
+		new_map.kv_size = boa_align_up(new_map.val_offset + map->val_size, kv_align);
 	} else {
 		new_map.block_num_slots = map->block_num_slots;
 		new_map.block_element_bits = map->block_element_bits;
@@ -325,17 +323,16 @@ int boa__map_rehash(boa_map *map)
 			new_map.num_hash_blocks = map->num_hash_blocks * 2;
 	}
 
-	// Alloacte at least 1/8 aux blocks per hash block
-	uint32_t auto_aux = new_map.num_hash_blocks / 8;
+	// Alloacte at least 1/2 aux blocks per hash block
+	uint32_t auto_aux = new_map.num_hash_blocks / 2;
 	if (num_aux < auto_aux) num_aux = auto_aux;
 	if (new_map.num_hash_blocks < 2) num_aux = 0;
 
 	new_map.allocation = NULL;
-	new_map.kv_size = map->kv_size;
 	new_map.num_total_blocks = new_map.num_hash_blocks + num_aux;
 	new_map.block_num_elements = 1 << new_map.block_element_bits;
 	new_map.num_used_blocks = new_map.num_hash_blocks;
-	new_map.capacity = new_map.num_hash_blocks * new_map.block_num_slots / 4;
+	new_map.capacity = new_map.num_hash_blocks * new_map.block_num_slots / 2;
 
 	boa_assert(new_map.block_num_slots <= 1 << BOA__MAP_LOWBITS);
 	boa_assert(new_map.block_num_elements <= 1 << (16 - BOA__MAP_LOWBITS));
@@ -349,15 +346,20 @@ int boa__map_rehash(boa_map *map)
 	{
 		uint32_t *hash_cur_slot = map->hash_cur_slot + block_ix * map->block_num_elements;
 		uint16_t *element_slot = map->element_slot + block_ix * map->block_num_slots;
+		const char *data = (const char *)map->data_blocks + block_ix * map->block_num_elements * map->kv_size;
 		num_elems = map->blocks[block_ix].count;
 		for (elem_ix = 0; elem_ix < num_elems; elem_ix++)
 		{
 			uint32_t hcs = hash_cur_slot[elem_ix];
 			uint16_t es = element_slot[hcs & BOA__MAP_LOWMASK];
 			uint32_t hash = (es & BOA__MAP_LOWMASK) | (hcs & BOA__MAP_HIGHMASK);
-			boa__map_insert_no_find(&new_map, hash);
+			boa__map_insert_no_find(&new_map, hash, data);
+			data += map->kv_size;
 		}
 	}
+
+	if (map->allocation)
+		boa_free_ator(map->ator, map->allocation);
 
 	*map = new_map;
 	return 1;
@@ -389,7 +391,7 @@ uint32_t boa__map_find_fallback(boa_map *map, uint32_t block_ix)
 			block->next_aux = 0;
 			memset(element_slot, 0xFF, sizeof(uint16_t) * map->block_num_slots);
 		}
-	} while (block->count >= 128);
+	} while (block->count >= map->block_num_elements);
 	return block_ix;
 }
 

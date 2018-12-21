@@ -415,7 +415,7 @@ uint32_t boa__map_find_fallback(boa_map *map, uint32_t block_ix);
 boa_inline uint32_t boa_map_insert(boa_map *map, const void *key, uint32_t hash, boa_cmp_fn cmp)
 {
 	// Rehash before insert for simplicity, also handles edge case of empty map
-	if (map->count * 4 >= map->capacity) {
+	if (map->count >= map->capacity) {
 		if (!boa__map_rehash(map)) return ~0u;
 	}
 
@@ -429,7 +429,7 @@ boa_inline uint32_t boa_map_insert(boa_map *map, const void *key, uint32_t hash,
 	// the blocks get full.
 	// Note: `boa__map_find_fallback()` may invalidate any pointers to the map!
 	uint32_t count = map->blocks[block_ix].count;
-	if (count >= 128) {
+	if (count >= map->block_num_elements) {
 		block_ix = boa__map_find_fallback(map, block_ix);
 		if (block_ix == ~0u) return ~0u;
 		count = map->blocks[block_ix].count;
@@ -442,10 +442,9 @@ boa_inline uint32_t boa_map_insert(boa_map *map, const void *key, uint32_t hash,
 
 	for (;;) {
 		uint32_t es = element_slot[slot_ix];
-		uint32_t diff = es - slot_ix;
 
 		// Match `LOWMASK` bits of the hash to the element-slot value
-		if ((diff & BOA__MAP_LOWMASK) == 0) {
+		if (((es ^ hash) & BOA__MAP_LOWMASK) == 0) {
 			uint32_t element_offset = es >> BOA__MAP_LOWBITS;
 			uint32_t element = block_ix * map->block_num_elements + element_offset;
 			void *kvp = (char*)map->data_blocks + element * map->kv_size;
@@ -455,13 +454,14 @@ boa_inline uint32_t boa_map_insert(boa_map *map, const void *key, uint32_t hash,
 		}
 
 		// If we find an empty slot or one with lower scan distance insert here
-		uint32_t ref_scan = diff & slot_mask;
+		uint32_t ref_scan = (slot_ix - es) & slot_mask;
 		if (es == 0xFFFF || ref_scan < scan) {
-			element_slot[slot_ix] = count | (hash & BOA__MAP_LOWMASK);
+			element_slot[slot_ix] = count << BOA__MAP_LOWBITS | (hash & BOA__MAP_LOWMASK);
 			map->blocks[block_ix].count = count + 1;
 			result = block_ix * map->block_num_elements + count;
 			map->hash_cur_slot[result] = slot_ix | (hash & BOA__MAP_HIGHMASK);
 			to_insert = es;
+			map->count++;
 			break;
 		}
 
@@ -502,10 +502,9 @@ boa_inline uint32_t boa_map_find(boa_map *map, const void *key, uint32_t hash, b
 
 	for (;;) {
 		uint32_t es = element_slot[slot_ix];
-		uint32_t diff = es - slot_ix;
 
 		// Match `LOWMASK` bits of the hash to the element-slot value
-		if ((diff & BOA__MAP_LOWMASK) == 0) {
+		if (((es ^ hash) & BOA__MAP_LOWMASK) == 0) {
 			uint32_t element_offset = es >> BOA__MAP_LOWBITS;
 			uint32_t element = block_ix * map->block_num_elements + element_offset;
 			void *kvp = (char*)map->data_blocks + element * map->kv_size;
@@ -515,7 +514,7 @@ boa_inline uint32_t boa_map_find(boa_map *map, const void *key, uint32_t hash, b
 		}
 
 		// If we find an empty slot or one with lower scan fail find
-		uint32_t ref_scan = diff & slot_mask;
+		uint32_t ref_scan = (slot_ix - es) & slot_mask;
 		if (es == 0xFFFF || ref_scan < scan) {
 			return ~0u;
 		}

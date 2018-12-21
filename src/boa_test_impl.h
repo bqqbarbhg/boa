@@ -15,9 +15,9 @@
 
 static inline void *boa__original_alloc(size_t size)
 {
-#ifdef BOA_MALLOC
-	return BOA_MALLOC(size);
-	#undef BOA_MALLOC
+#ifdef BOA_ALLOC
+	return BOA_ALLOC(size);
+	#undef BOA_ALLOC
 #else
 	return malloc(size);
 #endif
@@ -57,7 +57,7 @@ void *boa_test_alloc(size_t size);
 void *boa_test_realloc(void *ptr, size_t size);
 void boa_test_free(void *ptr);
 
-#define BOA_MALLOC boa_test_alloc
+#define BOA_ALLOC boa_test_alloc
 #define BOA_REALLOC boa_test_realloc
 #define BOA_FREE boa_test_free
 
