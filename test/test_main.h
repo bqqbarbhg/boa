@@ -34,13 +34,22 @@ int main(int argc, char **argv)
 	tests = boa_test_get_all(&num);
 	for (i = 0; i < num; i++) {
 		boa_test_fail fail;
+		boa_test *test = &tests[i];
 
-		printf("%s %s: ", boa_format(boa_clear(&namebuf), "[%s]", tests[i].name), tests[i].description);
+		printf("%s %s: ", boa_format(boa_clear(&namebuf), "[%s]", test->name), test->description);
 		fflush(stdout);
-		int status = boa_test_run(&tests[i], &fail);
+		int status = boa_test_run(test, &fail);
 		if (status) {
 			num_pass++;
-			printf("OK\n");
+			if (boa_non_empty(&test->permutations)) {
+				uint32_t count = 1;
+				boa_for (boa_test_permutation, p, &test->permutations) {
+					count *= p->num;
+				}
+				printf("OK x%u\n", count);
+			} else {
+				printf("OK\n");
+			}
 		} else {
 			const char *slash = strrchr(fail.file, '/');
 			const char *backslash = strrchr(fail.file, '\\');
@@ -54,7 +63,7 @@ int main(int argc, char **argv)
 			}
 			printf("    %s:%d: Assertion failed: %s\n", file, fail.line, fail.expression);
 
-			boa_for (boa_test_permutation, p, &tests[i].permutations) {
+			boa_for (boa_test_permutation, p, &test->permutations) {
 				printf("    Permutation %s: index %u\n", p->name, p->index);
 			}
 

@@ -148,4 +148,5 @@ BOA_TEST(map_large, "Insert a large amount of keys")
 }
 
 BOA_TEST_END_PERMUTATION(g_hash_factor)
+BOA_TEST_END_PERMUTATION(g_do_reserve)
 
