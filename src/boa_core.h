@@ -300,7 +300,7 @@ typedef int (*boa_cmp_fn)(const void *a, const void *b);
 int boa__map_rehash(boa_map *map);
 uint32_t boa__map_find_fallback(boa_map *map, uint32_t block_ix);
 
-boa_inline uint32_t boa_map_insert(boa_map *map, const void *key, uint32_t hash, boa_cmp_fn cmp)
+boa_inline uint32_t boa_map_insert_inline(boa_map *map, const void *key, uint32_t hash, boa_cmp_fn cmp)
 {
 	// Rehash before insert for simplicity, also handles edge case of empty map
 	if (map->count >= map->capacity) {
@@ -374,7 +374,7 @@ boa_inline uint32_t boa_map_insert(boa_map *map, const void *key, uint32_t hash,
 	return result;
 }
 
-boa_inline uint32_t boa_map_find(boa_map *map, const void *key, uint32_t hash, boa_cmp_fn cmp)
+boa_inline uint32_t boa_map_find_inline(boa_map *map, const void *key, uint32_t hash, boa_cmp_fn cmp)
 {
 	// Edge case: Other values may not be valid when empty!
 	if (map->count == 0) return ~0u;
@@ -417,6 +417,9 @@ boa_inline uint32_t boa_map_find(boa_map *map, const void *key, uint32_t hash, b
 
 	return ~0u;
 }
+
+uint32_t boa_map_insert(boa_map *map, const void *key, uint32_t hash, boa_cmp_fn cmp);
+uint32_t boa_map_find(boa_map *map, const void *key, uint32_t hash, boa_cmp_fn cmp);
 
 uint32_t boa_map_erase(boa_map *map, uint32_t element);
 

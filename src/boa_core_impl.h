@@ -409,6 +409,16 @@ uint32_t boa__map_find_fallback(boa_map *map, uint32_t block_ix)
 	return block_ix;
 }
 
+uint32_t boa_map_insert(boa_map *map, const void *key, uint32_t hash, boa_cmp_fn cmp)
+{
+	return boa_map_insert_inline(map, key, hash, cmp);
+}
+
+uint32_t boa_map_find(boa_map *map, const void *key, uint32_t hash, boa_cmp_fn cmp)
+{
+	return boa_map_find_inline(map, key, hash, cmp);
+}
+
 uint32_t boa_map_erase(boa_map *map, uint32_t element)
 {
 	uint32_t block_ix = element >> map->block_element_bits;

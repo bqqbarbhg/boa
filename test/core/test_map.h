@@ -10,14 +10,14 @@ int int_cmp(const void *a, const void *b){ return *(int*)a == *(int*)b; }
 
 void insert_int(boa_map *map, int k, int v)
 {
-	uint32_t elem = boa_map_insert(map, &k, int_hash(k), &int_cmp);
+	uint32_t elem = boa_map_insert_inline(map, &k, int_hash(k), &int_cmp);
 	*boa_key(int, map, elem) = k;
 	*boa_val(int, map, elem) = v;
 }
 
 int find_int(boa_map *map, int k)
 {
-	uint32_t elem = boa_map_find(map, &k, int_hash(k), &int_cmp);
+	uint32_t elem = boa_map_find_inline(map, &k, int_hash(k), &int_cmp);
 	return elem != ~0u ? *boa_val(int, map, elem) : -1;
 }
 
