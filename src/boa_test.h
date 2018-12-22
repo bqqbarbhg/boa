@@ -1,12 +1,18 @@
 
 #ifdef BOA_TEST
 	#undef BOA_TEST
+	#undef BOA_TEST_BEGIN_PERMUTATION
+	#undef BOA_TEST_END_PERMUTATION
 #endif
 
 #if BOA_TEST_MODE == BOA_TEST_IMPLEMENT
 	#define BOA_TEST(name, desc) void boa_test__##name()
+	#define BOA_TEST_BEGIN_PERMUTATION(name, values)
+	#define BOA_TEST_END_PERMUTATION(name)
 #elif BOA_TEST_MODE == BOA_TEST_GATHER
 	#define BOA_TEST(name, desc) boa_test_add(&boa_test__##name, #name, desc, __FILE__, __LINE__); if (0)
+	#define BOA_TEST_BEGIN_PERMUTATION(name, values) boa_test_set_permutation(&(name), #name, (values), sizeof(values) / sizeof(*(values)), sizeof(*(values)));
+	#define BOA_TEST_END_PERMUTATION(name) boa_test_set_permutation(&name, #name, 0, 0, 0);
 #elif defined(BOA_TEST_MODE)
 	#error "Invalid BOA_TEST_MODE"
 #endif
@@ -42,11 +48,24 @@
 
 #define BOA_TEST_IMPL (BOA_TEST_MODE == BOA_TEST_IMPLEMENT)
 
+void boa__test_do_fail(const char *file, int line, const char *expr, char *desc);
+
+#include "boa_core.h"
+
 typedef struct boa_test {
 	void (*test_fn)();
 	const char *name, *description, *file;
 	int line;
+
+	boa_buf permutations;
 } boa_test;
+
+typedef struct boa_test_permutation {
+	void *ptr;
+	const char *name;
+	const void *values;
+	uint32_t num, value_size, index;
+} boa_test_permutation;
 
 typedef struct boa_test_fail {
 	const char *file;
@@ -56,17 +75,15 @@ typedef struct boa_test_fail {
 } boa_test_fail;
 
 void boa_test_add(void (*test_fn)(), const char *name, const char *desc, const char *file, int line);
-const boa_test *boa_test_get_all(size_t *count);
-int boa_test_run(const boa_test *test, boa_test_fail *fail);
+void boa_test_set_permutation(void *ptr, const char *name, const void *values, size_t num, size_t value_size);
+
+boa_test *boa_test_get_all(size_t *count);
+int boa_test_run(boa_test *test, boa_test_fail *fail);
 
 void boa_test_expect_fail();
 
-void boa__test_do_fail(const char *file, int line, const char *expr, char *desc);
-
 void boa_test_fail_allocations(int delay, int count);
 #define boa_test_fail_next_allocation() boa_test_fail_allocations(0, 1)
-
-#include "boa_core.h"
 
 boa_inline boa_allocator *boa_test_original_ator()
 {

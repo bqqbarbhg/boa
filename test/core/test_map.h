@@ -3,7 +3,9 @@
 #include <boa_core.h>
 
 #if BOA_TEST_IMPL
-uint32_t int_hash(int i){ return i % 10000 * 13; }
+uint32_t g_hash_factor;
+
+uint32_t int_hash(int i){ return i % 10000 * g_hash_factor; }
 int int_cmp(const void *a, const void *b){ return *(int*)a == *(int*)b; }
 
 void insert_int(boa_map *map, int k, int v)
@@ -19,8 +21,24 @@ int find_int(boa_map *map, int k)
 	return elem != ~0u ? *boa_val(int, map, elem) : -1;
 }
 
+#else
+
+extern uint32_t g_hash_factor;
+
+static uint32_t hash_factors[] = {
+	13, // < Provides reasonable hashing
+	1,  // < Degrades to linear
+	0,  // < Degrades to linked list
+};
+
+static uint32_t hash_factors_no_zero[] = {
+	13, // < Provides reasonable hashing
+	1,  // < Degrades to linear
+};
+
 #endif
 
+BOA_TEST_BEGIN_PERMUTATION(g_hash_factor, hash_factors)
 
 BOA_TEST(map_simple, "Simple manual map test")
 {
@@ -66,6 +84,8 @@ BOA_TEST(map_simple_collision, "Simple manual hash collision test")
 	boa_map_reset(map);
 }
 
+BOA_TEST_BEGIN_PERMUTATION(g_hash_factor, hash_factors_no_zero)
+
 BOA_TEST(map_large, "Insert a large amount of keys")
 {
 	boa_map mapv = { 0 }, *map = &mapv;
@@ -82,4 +102,6 @@ BOA_TEST(map_large, "Insert a large amount of keys")
 
 	boa_map_reset(map);
 }
+
+BOA_TEST_END_PERMUTATION(g_hash_factor)
 

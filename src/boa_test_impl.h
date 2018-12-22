@@ -80,9 +80,12 @@ typedef struct boa__test_alloc_hdr {
 
 boa__test_alloc_hdr boa__test_alloc_head;
 
+boa_buf boa__test_active_permutations;
+
 void boa_test_add(void (*test_fn)(), const char *name, const char *desc, const char *file, int line)
 {
 	boa_buf_set_ator(&boa__all_tests, boa_test_original_ator());
+
 	boa_test *test = boa_push(boa_test, &boa__all_tests);
 	if (test) {
 		test->test_fn = test_fn;
@@ -90,16 +93,62 @@ void boa_test_add(void (*test_fn)(), const char *name, const char *desc, const c
 		test->description = desc;
 		test->file = file;
 		test->line = line;
+
+		test->permutations = boa_empty_buf_ator(boa_test_original_ator());
+		boa_buf_push_buf(&test->permutations, &boa__test_active_permutations);
 	}
 }
 
-const boa_test *boa_test_get_all(size_t *count)
+void boa_test_set_permutation(void *ptr, const char *name, const void *values, size_t num, size_t value_size)
+{
+	boa_buf *active = &boa__test_active_permutations;
+	boa_buf_set_ator(active, boa_test_original_ator());
+
+	uint32_t i, num_active = boa_count(boa_test_permutation, active);
+	for (i = 0; i < num_active; i++) {
+		boa_test_permutation *p = &boa_get(boa_test_permutation, active, i);
+		if (p->ptr == ptr) break;
+	}
+
+	if (i < num_active) {
+		if (values) {
+			boa_test_permutation *p = &boa_get(boa_test_permutation, active, i); 
+			p->values = values;
+			p->num = (uint32_t)num;
+			p->value_size = (uint32_t)value_size;
+		} else {
+			boa_erase(boa_test_permutation, active, i);
+		}
+	} else if (values) {
+		boa_test_permutation *p = boa_push(boa_test_permutation, active); 
+		p->ptr = ptr;
+		p->name = name;
+		p->values = values;
+		p->num = (uint32_t)num;
+		p->value_size = (uint32_t)value_size;
+	}
+}
+
+static int boa__test_next_permutation_values(boa_buf *permutations)
+{
+	boa_for (boa_test_permutation, p, permutations) {
+		if (p->index < p->num) {
+			p->index++;
+			return 1;
+		} else {
+			p->index = 0;
+		}
+	}
+	return 0;
+}
+
+boa_test *boa_test_get_all(size_t *count)
 {
 	*count = boa_count(boa_test, &boa__all_tests);
 	return boa_begin(boa_test, &boa__all_tests);
 }
 
-int boa_test_run(const boa_test *test, boa_test_fail *fail)
+static int boa__test_run_permutation(const boa_test *test, boa_test_fail *fail)
 {
 	int status = 0;
 	if (!setjmp(boa__test_jmp)) {
@@ -153,6 +202,23 @@ int boa_test_run(const boa_test *test, boa_test_fail *fail)
 	boa__test_alloc_fail_count = 0;
 
 	return status;
+}
+
+int boa_test_run(boa_test *test, boa_test_fail *fail)
+{
+	boa_for (boa_test_permutation, p, &test->permutations) {
+		p->index = 0;
+	}
+	do {
+		boa_for (boa_test_permutation, p, &test->permutations) {
+			memcpy(p->ptr, (char*)p->values + p->index * p->value_size, p->value_size);
+		}
+		if (!boa__test_run_permutation(test, fail)) {
+			return 0;
+		}
+	} while (boa__test_next_permutation_values(&test->permutations));
+
+	return 1;
 }
 
 void boa_test_expect_fail()

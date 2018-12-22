@@ -22,7 +22,7 @@ int main(int argc, char **argv)
 {
 	int num_pass = 0;
 	size_t i, num;
-	const boa_test *tests;
+	boa_test *tests;
 	
 	gather_tests();
 
@@ -53,6 +53,11 @@ int main(int argc, char **argv)
 				boa_free_ator(original, fail.description);
 			}
 			printf("    %s:%d: Assertion failed: %s\n", file, fail.line, fail.expression);
+
+			boa_for (boa_test_permutation, p, &tests[i].permutations) {
+				printf("    Permutation %s: index %u\n", p->name, p->index);
+			}
+
 			printf("\n");
 		}
 	}

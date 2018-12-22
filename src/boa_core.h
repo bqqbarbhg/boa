@@ -139,6 +139,22 @@ boa_inline void *boa_buf_push(boa_buf *buf, uint32_t size)
 	return ptr;
 }
 
+boa_inline int boa_buf_push_data(boa_buf *buf, const void *data, uint32_t size)
+{
+	void *ptr = boa_buf_push(buf, size);
+	if (ptr) {
+		memcpy(ptr, data, size);
+		return 1;
+	} else {
+		return 0;
+	}
+}
+
+boa_inline int boa_buf_push_buf(boa_buf *dst, const boa_buf *src)
+{
+	return boa_buf_push_data(dst, src->data, src->end_pos);
+}
+
 boa_inline boa_allocator *boa_buf_ator(boa_buf *buf)
 {
 	return (boa_allocator*)(buf->ator_flags & ~(uintptr_t)BOA_BUF_FLAG_MASK);
@@ -178,6 +194,7 @@ boa_inline void boa_buf_erase(boa_buf *buf, uint32_t offset, uint32_t size)
 int boa_buf_set_ator(boa_buf *buf, boa_allocator *ator);
 
 void *boa_buf_insert(boa_buf *buf, uint32_t pos, uint32_t size);
+
 
 char *boa_format(boa_buf *buf, const char *fmt, ...);
 
@@ -222,6 +239,8 @@ char *boa_format(boa_buf *buf, const char *fmt, ...);
 #define boa_get_n(type, buf, pos, n) ((type*)boa_buf_get((buf), (pos) * sizeof(type), (n) * sizeof(type)))
 
 #define boa_bytesleft(buf) ((buf)->cap_pos - (buf)->end_pos)
+
+#define boa_for(type, name, buf) for (type *name = boa_begin(type, buf), *name##__end = boa_end(type, buf); name != name##__end; name++)
 
 // -- boa_map
 
