@@ -3,7 +3,7 @@
 #include <boa_core.h>
 
 #if BOA_TEST_IMPL
-uint32_t int_hash(int i){ return i % 1000; }
+uint32_t int_hash(int i){ return i % 10000 * 13; }
 int int_cmp(const void *a, const void *b){ return *(int*)a == *(int*)b; }
 
 void insert_int(boa_map *map, int k, int v)
@@ -50,18 +50,18 @@ BOA_TEST(map_simple_collision, "Simple manual hash collision test")
 	map->key_size = sizeof(int);
 	map->val_size = sizeof(int);
 
-	insert_int(map, 1000, 1);
-	insert_int(map, 2000, 2);
-	insert_int(map, 3000, 3);
-	insert_int(map, 4000, 4);
+	insert_int(map, 10000, 1);
+	insert_int(map, 20000, 2);
+	insert_int(map, 30000, 3);
+	insert_int(map, 40000, 4);
 
 	boa_assert(map->count == 4);
 
-	boa_assert(find_int(map, 1000) == 1);
-	boa_assert(find_int(map, 2000) == 2);
-	boa_assert(find_int(map, 3000) == 3);
-	boa_assert(find_int(map, 4000) == 4);
-	boa_assert(find_int(map, 5000) == -1);
+	boa_assert(find_int(map, 10000) == 1);
+	boa_assert(find_int(map, 20000) == 2);
+	boa_assert(find_int(map, 30000) == 3);
+	boa_assert(find_int(map, 40000) == 4);
+	boa_assert(find_int(map, 50000) == -1);
 
 	boa_map_reset(map);
 }
@@ -78,7 +78,7 @@ BOA_TEST(map_large, "Insert a large amount of keys")
 	boa_assert(map->count == 10000);
 
 	for (int i = 0; i < 10000; i++)
-		boa_assert(find_int(map, i) == i * i);
+		boa_assertf(find_int(map, i) == i * i, "Index: %i", i);
 
 	boa_map_reset(map);
 }
