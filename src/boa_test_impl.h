@@ -204,18 +204,25 @@ static int boa__test_run_permutation(const boa_test *test, boa_test_fail *fail)
 	return status;
 }
 
-int boa_test_run(boa_test *test, boa_test_fail *fail)
+int boa_test_run(boa_test *test, boa_test_fail *fail, int permutation_filter)
 {
+	int permutation_index = 0;
 	boa_for (boa_test_permutation, p, &test->permutations) {
 		p->index = 0;
 	}
 	do {
-		boa_for (boa_test_permutation, p, &test->permutations) {
-			memcpy(p->ptr, (char*)p->values + p->index * p->value_size, p->value_size);
+		if (permutation_filter < 0 || permutation_filter == permutation_index) {
+			boa_for (boa_test_permutation, p, &test->permutations) {
+				memcpy(p->ptr, (char*)p->values + p->index * p->value_size, p->value_size);
+			}
+
+			if (!boa__test_run_permutation(test, fail)) {
+				fail->permutation_index = permutation_index;
+				return 0;
+			}
 		}
-		if (!boa__test_run_permutation(test, fail)) {
-			return 0;
-		}
+
+		permutation_index++;
 	} while (boa__test_next_permutation_values(&test->permutations));
 
 	return 1;

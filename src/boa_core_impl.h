@@ -10,6 +10,19 @@
 #ifndef BOA__CORE_IMPLEMENTED
 #define BOA__CORE_IMPLEMENTED
 
+// -- Utility
+
+uint32_t boa_round_pow2_up(uint32_t value)
+{
+	uint32_t x = value - 1;
+	x |= x >> 1;
+	x |= x >> 2;
+	x |= x >> 4;
+	x |= x >> 8;
+	x |= x >> 16;
+	return x + 1;
+}
+
 // -- boa_allocator
 
 #ifndef BOA_ALLOC
@@ -229,7 +242,6 @@ static void boa__map_insert_no_find(boa_map *map, uint32_t hash, const void *dat
 	uint16_t *element_slot = map->impl.element_slot + block_ix * map->impl.block_num_slots;
 	uint32_t scan = 0;  // < Number of slots scanned from insertion point
 	uint16_t displaced; // < Displaced element-slot value that needs to be inserted
-	uint32_t element;   // < Resulting element index
 
 	for (;;) {
 		uint32_t es = element_slot[slot_ix];
@@ -239,7 +251,7 @@ static void boa__map_insert_no_find(boa_map *map, uint32_t hash, const void *dat
 		if (es == 0 || ref_scan < scan) {
 			// Insert as last element of the block
 			element_slot[slot_ix] = boa__es_make(count, hash);
-			element = boa__map_element_from_block(map, block_ix, count);
+			uint32_t element = boa__map_element_from_block(map, block_ix, count);
 			map->impl.hash_cur_slot[element] = boa__hcs_make(hash, slot_ix);
 			map->impl.blocks[block_ix].count = count + 1;
 			displaced = es;
@@ -261,6 +273,11 @@ static void boa__map_insert_no_find(boa_map *map, uint32_t hash, const void *dat
 		uint32_t es = element_slot[slot_ix];
 		uint32_t ref_scan = (slot_ix - es) & slot_mask;
 		if (es == 0 || ref_scan < scan) {
+			uint32_t element_offset = boa__es_element_offset(displaced);
+			uint32_t element = boa__map_element_from_block(map, block_ix, element_offset);
+			uint32_t hcs = map->impl.hash_cur_slot[element];
+			map->impl.hash_cur_slot[element] = boa__hcs_set_slot(hcs, slot_ix);
+
 			element_slot[slot_ix] = displaced;
 			displaced = es;
 		}
@@ -325,7 +342,8 @@ int boa_map_reserve(boa_map *map, uint32_t capacity)
 		new_map.impl.block_num_slots = capacity * 2;
 		new_map.impl.block_num_elements = capacity;
 	} else {
-		new_map.impl.num_hash_blocks = (capacity * 4 / 3 + BOA__MAP_BLOCK_MAX_ELEMENTS - 1) / BOA__MAP_BLOCK_MAX_ELEMENTS;
+		uint32_t cap = (capacity * 4 / 3 + BOA__MAP_BLOCK_MAX_ELEMENTS - 1) / BOA__MAP_BLOCK_MAX_ELEMENTS;
+		new_map.impl.num_hash_blocks = boa_round_pow2_up(cap);
 		new_map.impl.block_num_slots = BOA__MAP_BLOCK_MAX_SLOTS;
 		new_map.impl.block_num_elements = BOA__MAP_BLOCK_MAX_ELEMENTS;
 	}

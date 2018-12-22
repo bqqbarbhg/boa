@@ -23,6 +23,17 @@ int main(int argc, char **argv)
 	int num_pass = 0;
 	size_t i, num;
 	boa_test *tests;
+
+	const char *test_filter = NULL;
+	int permutation_filter = -1;
+
+	if (argc > 1) {
+		test_filter = argv[1];
+	}
+
+	if (argc > 2) {
+		permutation_filter = atoi(argv[2]);
+	}
 	
 	gather_tests();
 
@@ -31,14 +42,20 @@ int main(int argc, char **argv)
 	char namebuf_data[128];
 	boa_buf namebuf = boa_array_buf_ator(namebuf_data, original);
 
+	int num_ran = 0;
 	tests = boa_test_get_all(&num);
 	for (i = 0; i < num; i++) {
 		boa_test_fail fail;
 		boa_test *test = &tests[i];
 
+		if (test_filter) {
+			if (strcmp(test->name, test_filter)) continue;
+		}
+		num_ran++;
+
 		printf("%s %s: ", boa_format(boa_clear(&namebuf), "[%s]", test->name), test->description);
 		fflush(stdout);
-		int status = boa_test_run(test, &fail);
+		int status = boa_test_run(test, &fail, permutation_filter);
 		if (status) {
 			num_pass++;
 			if (boa_non_empty(&test->permutations)) {
@@ -63,8 +80,12 @@ int main(int argc, char **argv)
 			}
 			printf("    %s:%d: Assertion failed: %s\n", file, fail.line, fail.expression);
 
+			if (boa_non_empty(&test->permutations)) {
+				printf("    Permutation index %d\n", fail.permutation_index);
+			}
+
 			boa_for (boa_test_permutation, p, &test->permutations) {
-				printf("    Permutation %s: index %u\n", p->name, p->index);
+				printf("    ... %s: index %u\n", p->name, p->index);
 			}
 
 			printf("\n");
@@ -74,9 +95,9 @@ int main(int argc, char **argv)
 	boa_reset(&namebuf);
 
 	printf("\n");
-	printf("Tests passed: %d / %d\n", num_pass, (int)num);
+	printf("Tests passed: %d / %d\n", num_pass, num_ran);
 
-	return num_pass == (int)num ? 0 : 1;
+	return num_pass == num_ran ? 0 : 1;
 }
 
 

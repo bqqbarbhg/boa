@@ -72,6 +72,7 @@ typedef struct boa_test_fail {
 	int line;
 	const char *expression;
 	char *description;
+	int permutation_index;
 } boa_test_fail;
 
 void boa_test_add(void (*test_fn)(), const char *name, const char *desc, const char *file, int line);
