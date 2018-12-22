@@ -249,7 +249,7 @@ char *boa_format(boa_buf *buf, const char *fmt, ...);
 #define BOA__MAP_HIGHMASK (~(uint32_t)BOA__MAP_LOWMASK)
 #define BOA__MAP_BLOCK_SHIFT 7
 #define BOA__MAP_BLOCK_MAX_SLOTS (1 << BOA__MAP_BLOCK_SHIFT)
-#define BOA__MAP_BLOCK_MAX_ELEMENTS ((1 << (16 - BOA__MAP_LOWBITS)) - 1)
+#define BOA__MAP_BLOCK_MAX_ELEMENTS (1 << (16 - BOA__MAP_LOWBITS))
 
 typedef struct boa__map_impl {
 	uint32_t kv_size;            // < Size of a key-value pair in bytes
@@ -304,7 +304,6 @@ typedef struct boa__map_block {
 // Return non-zero if `a` is equal to `b`
 typedef int (*boa_cmp_fn)(const void *a, const void *b);
 
-int boa__map_rehash(boa_map *map);
 uint32_t boa__map_find_fallback(boa_map *map, uint32_t block_ix);
 
 #define boa__es_make(element, hash) (uint16_t)((element) << BOA__MAP_LOWBITS | (hash) & BOA__MAP_LOWMASK)
@@ -318,12 +317,19 @@ uint32_t boa__map_find_fallback(boa_map *map, uint32_t block_ix);
 #define boa__map_element_from_block(map, block, offset) ((block) * (map)->impl.block_num_elements + (offset))
 #define boa__map_kv_from_element(map, element) ((void*)((char*)(map)->impl.data_blocks + (element) * (map)->impl.kv_size))
 
+// Set the lowest bit of the hash to 1 if bits 1:LOWBITS are 0
+#define boa__map_hash_canonicalize(hash) ((hash) | ((uint32_t)((hash) & BOA__MAP_LOWMASK) - 1) >> 31)
+
+int boa_map_reserve(boa_map *map, uint32_t capacity);
+
 boa_inline uint32_t boa_map_insert_inline(boa_map *map, const void *key, uint32_t hash, boa_cmp_fn cmp)
 {
 	// Rehash before insert for simplicity, also handles edge case of empty map
 	if (map->count >= map->capacity) {
-		if (!boa__map_rehash(map)) return ~0u;
+		if (!boa_map_reserve(map, map->capacity * 2)) return ~0u;
 	}
+
+	hash = boa__map_hash_canonicalize(hash);
 
 	// Calculate block and slot indices from the hash
 	uint32_t block_mask = map->impl.num_hash_blocks - 1;
@@ -361,7 +367,7 @@ boa_inline uint32_t boa_map_insert_inline(boa_map *map, const void *key, uint32_
 
 		// If we find an empty slot or one with lower scan distance insert here
 		uint32_t ref_scan = boa__es_scan_distance(es, slot_ix, slot_mask);
-		if (es == 0xFFFF || ref_scan < scan) {
+		if (es == 0 || ref_scan < scan) {
 			// Insert as last element of the block
 			element_slot[slot_ix] = boa__es_make(count, hash);
 			element = boa__map_element_from_block(map, block_ix, count);
@@ -377,13 +383,13 @@ boa_inline uint32_t boa_map_insert_inline(boa_map *map, const void *key, uint32_
 	}
 
 	// While we're holding a displaced slot insert it somewhere
-	while (displaced != 0xFFFF) {
+	while (displaced != 0) {
 		slot_ix = (slot_ix + 1) & slot_mask;
 		scan++;
 
 		uint32_t es = element_slot[slot_ix];
 		uint32_t ref_scan = (slot_ix - es) & slot_mask;
-		if (es == 0xFFFF || ref_scan < scan) {
+		if (es == 0 || ref_scan < scan) {
 			element_slot[slot_ix] = displaced;
 			displaced = es;
 		}
@@ -397,10 +403,12 @@ boa_inline uint32_t boa_map_find_inline(boa_map *map, const void *key, uint32_t 
 	// Edge case: Other values may not be valid when empty!
 	if (map->count == 0) return ~0u;
 
+	hash = boa__map_hash_canonicalize(hash);
+
 	// Calculate block and slot indices from the hash
 	uint32_t block_mask = map->impl.num_hash_blocks - 1;
 	uint32_t slot_mask = map->impl.block_num_slots - 1;
-	uint32_t block_ix = (hash >> 8) & block_mask;
+	uint32_t block_ix = (hash >> BOA__MAP_BLOCK_SHIFT) & block_mask;
 
 	do {
 		uint32_t slot_ix = hash & slot_mask;
@@ -422,7 +430,7 @@ boa_inline uint32_t boa_map_find_inline(boa_map *map, const void *key, uint32_t 
 
 			// If we find an empty slot or one with lower scan fail find
 			uint32_t ref_scan = boa__es_scan_distance(es, slot_ix, slot_mask);
-			if (es == 0xFFFF || ref_scan < scan) {
+			if (es == 0 || ref_scan < scan) {
 				break;
 			}
 

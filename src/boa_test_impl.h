@@ -132,8 +132,8 @@ void boa_test_set_permutation(void *ptr, const char *name, const void *values, s
 static int boa__test_next_permutation_values(boa_buf *permutations)
 {
 	boa_for (boa_test_permutation, p, permutations) {
+		p->index++;
 		if (p->index < p->num) {
-			p->index++;
 			return 1;
 		} else {
 			p->index = 0;
