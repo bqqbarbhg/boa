@@ -1,0 +1,10 @@
+sudo: false
+
+language: cpp
+
+script:
+    - clang test/test.cpp -Isrc -o test_cpp
+    - clang test/test.c -Isrc -o test_c
+    - ./test_cpp
+    - ./test_c
+
