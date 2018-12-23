@@ -79,7 +79,7 @@ void boa_test_add(void (*test_fn)(), const char *name, const char *desc, const c
 void boa_test_set_permutation(void *ptr, const char *name, const void *values, size_t num, size_t value_size);
 
 boa_test *boa_test_get_all(size_t *count);
-int boa_test_run(boa_test *test, boa_test_fail *fail);
+int boa_test_run(boa_test *test, boa_test_fail *fail, int permutation_filter);
 
 void boa_test_expect_fail();
 
