@@ -3,6 +3,14 @@
 #ifndef BOA__CORE_INCLUDED
 #define BOA__CORE_INCLUDED
 
+// -- Platform
+
+#if defined(_MSC_VER)
+	#define BOA_MSVC 1
+#elif defined(__GNUC__) || defined(__clang__)
+	#define BOA_GNUC 1
+#endif
+
 // -- General helpers
 
 #include <stdint.h>
@@ -55,6 +63,7 @@ boa_inline uint32_t boa_align_up(uint32_t value, uint32_t align)
 }
 
 uint32_t boa_round_pow2_up(uint32_t value);
+uint32_t boa_highest_bit(uint32_t value);
 
 // -- boa_allocator
 
@@ -257,13 +266,14 @@ char *boa_format(boa_buf *buf, const char *fmt, ...);
 #define BOA__MAP_BLOCK_MAX_ELEMENTS (1 << (16 - BOA__MAP_LOWBITS))
 
 typedef struct boa__map_impl {
-	uint32_t kv_size;            // < Size of a key-value pair in bytes
-	uint32_t val_offset;         // < Offset of the value from the key in bytes
-	uint32_t num_hash_blocks;    // < Number of primary blocks in the map, must be a power of two.
-	uint32_t num_total_blocks;   // < Total number of (primary + auxilary) blocks
-	uint32_t num_used_blocks;    // < Number of used (primary + auxilary) blocks
-	uint32_t block_num_slots;    // < Number of slots (hash locations) in a block
-	uint32_t block_num_elements; // < Number of elements (key-value pairs) in a block
+	uint32_t kv_size;             // < Size of a key-value pair in bytes
+	uint32_t val_offset;          // < Offset of the value from the key in bytes
+	uint32_t num_hash_blocks;     // < Number of primary blocks in the map, must be a power of two.
+	uint32_t num_total_blocks;    // < Total number of (primary + auxilary) blocks
+	uint32_t num_used_blocks;     // < Number of used (primary + auxilary) blocks
+	uint32_t block_num_slots;     // < Number of slots (hash locations) in a block
+	uint32_t block_num_elements;  // < Number of elements (key-value pairs) in a block
+	uint32_t element_block_shift; // < How much to shift by to get from element its block
 
 	// Combined allocation pointer
 	void *allocation;
@@ -462,16 +472,18 @@ uint32_t boa_map_erase(boa_map *map, uint32_t element);
 
 uint32_t boa_map_begin(boa_map *map);
 
-uint32_t boa__map_find_next(boa_map *map, uint32_t element);
+uint32_t boa__map_find_next(boa_map *map, uint32_t block_ix);
 
 boa_inline uint32_t boa_map_next(boa_map *map, uint32_t element)
 {
-	uint32_t block_ix = element >> BOA__MAP_BLOCK_SHIFT;
+	uint32_t block_element_mask = map->impl.block_num_elements - 1;
+	uint32_t block_ix = element >> map->impl.element_block_shift;
+	uint32_t element_offset = element & block_element_mask;
 	boa__map_block *block = &map->impl.blocks[block_ix];
-	if (block_ix < block->count) {
+	if (element_offset + 1 < block->count) {
 		return element + 1;
 	} else {
-		return boa__map_find_next(map, element);
+		return boa__map_find_next(map, block_ix);
 	}
 }
 

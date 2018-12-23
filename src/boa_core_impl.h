@@ -10,6 +10,10 @@
 #ifndef BOA__CORE_IMPLEMENTED
 #define BOA__CORE_IMPLEMENTED
 
+#if BOA_MSVC
+	#include <intrin.h>
+#endif
+
 // -- Utility
 
 uint32_t boa_round_pow2_up(uint32_t value)
@@ -21,6 +25,34 @@ uint32_t boa_round_pow2_up(uint32_t value)
 	x |= x >> 8;
 	x |= x >> 16;
 	return x + 1;
+}
+
+uint32_t boa_highest_bit(uint32_t value)
+{
+#if BOA_MSVC
+	unsigned long result;
+	_BitScanReverse(&result, value);
+	return result;
+#elif BOA_GNUC
+	return 31 - __builtin_clz(value);
+#else
+	// https://graphics.stanford.edu/~seander/bithacks.html#IntegerLogDeBruijn
+	uint32_t v = value;
+
+	static const uint32_t MultiplyDeBruijnBitPosition[32] = 
+	{
+	  0, 9, 1, 10, 13, 21, 2, 29, 11, 14, 16, 18, 22, 25, 3, 30,
+	  8, 12, 20, 28, 15, 17, 24, 7, 19, 27, 23, 6, 26, 5, 4, 31
+	};
+
+	v |= v >> 1;
+	v |= v >> 2;
+	v |= v >> 4;
+	v |= v >> 8;
+	v |= v >> 16;
+
+	return MultiplyDeBruijnBitPosition[(uint32_t)(v * 0x07C4ACDDU) >> 27];
+#endif
 }
 
 // -- boa_allocator
@@ -337,6 +369,7 @@ int boa_map_reserve(boa_map *map, uint32_t capacity)
 	new_map.impl.kv_size = boa_align_up(new_map.impl.val_offset + map->val_size, kv_align);
 
 	if (capacity <= BOA__MAP_BLOCK_MAX_ELEMENTS) {
+		capacity = boa_round_pow2_up(capacity);
 		num_aux = 0;
 		new_map.impl.num_hash_blocks = 1;
 		new_map.impl.block_num_slots = capacity * 2;
@@ -354,6 +387,7 @@ int boa_map_reserve(boa_map *map, uint32_t capacity)
 	if (new_map.impl.num_hash_blocks < 2) num_aux = 0;
 
 	new_map.impl.allocation = NULL;
+	new_map.impl.element_block_shift = boa_highest_bit(new_map.impl.block_num_elements);
 	new_map.impl.num_total_blocks = new_map.impl.num_hash_blocks + num_aux;
 	new_map.impl.num_used_blocks = new_map.impl.num_hash_blocks;
 	if (new_map.impl.num_hash_blocks > 1) {
@@ -520,9 +554,8 @@ uint32_t boa_map_begin(boa_map *map)
 	return ~0u;
 }
 
-uint32_t boa__map_find_next(boa_map *map, uint32_t element)
+uint32_t boa__map_find_next(boa_map *map, uint32_t block_ix)
 {
-	uint32_t block_ix = element >> BOA__MAP_BLOCK_SHIFT;
 	boa__map_block *block = &map->impl.blocks[block_ix];
 	uint32_t count = map->impl.num_used_blocks;
 	block_ix++;
