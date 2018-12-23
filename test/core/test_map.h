@@ -22,6 +22,14 @@ int find_int(boa_map *map, int k)
 	return elem != ~0u ? *boa_val(int, map, elem) : -1;
 }
 
+void erase_int(boa_map *map, int k)
+{
+	uint32_t elem = boa_map_find_inline(map, &k, int_hash(k), &int_cmp);
+	if (elem != ~0u) {
+		boa_map_erase(map, elem);
+	}
+}
+
 #else
 
 extern uint32_t g_hash_factor;
@@ -117,6 +125,33 @@ BOA_TEST(map_medium, "Insert a medium amount of keys")
 
 	for (uint32_t i = 0; i < count; i++)
 		boa_assertf(find_int(map, i) == i * i, "Index: %i", i);
+
+	boa_map_reset(map);
+}
+
+BOA_TEST(map_erase_simple, "Erase values from a hash map")
+{
+	boa_map mapv = { 0 }, *map = &mapv;
+	map->key_size = sizeof(int);
+	map->val_size = sizeof(int);
+
+	if (g_do_reserve) {
+		boa_map_reserve(map, 64);
+	}
+
+	insert_int(map, 1, 10);
+	insert_int(map, 2, 20);
+	insert_int(map, 3, 30);
+	insert_int(map, 4, 40);
+
+	erase_int(map, 2);
+	erase_int(map, 4);
+
+	boa_assert(find_int(map, 1) == 10);
+	boa_assert(find_int(map, 2) == -1);
+	boa_assert(find_int(map, 3) == 30);
+	boa_assert(find_int(map, 4) == -1);
+	boa_assert(find_int(map, 5) == -1);
 
 	boa_map_reset(map);
 }

@@ -443,8 +443,8 @@ uint32_t boa_map_find(boa_map *map, const void *key, uint32_t hash, boa_cmp_fn c
 
 uint32_t boa_map_erase(boa_map *map, uint32_t element)
 {
-	uint32_t block_ix = element >> BOA__MAP_BLOCK_SHIFT;
 	uint32_t slot_ix = boa__hcs_current_slot(map->impl.hash_cur_slot[element]);
+	uint32_t block_ix = slot_ix >> BOA__MAP_BLOCK_SHIFT;
 	uint32_t element_ix = element & (map->impl.block_num_elements - 1);
 
 	uint32_t *hash_cur_slot = map->impl.hash_cur_slot + block_ix * map->impl.block_num_elements;
@@ -454,13 +454,13 @@ uint32_t boa_map_erase(boa_map *map, uint32_t element)
 	uint32_t count = block->count - 1;
 	block->count = count;
 
-	element_slot[slot_ix] = 0;
+	uint32_t result = ~0u;
 
 	// Swap the last element to the current element location
 	if (element_ix != count) {
 		uint32_t last_slot = hash_cur_slot[count] & BOA__MAP_LOWMASK;
-		uint16_t ec = element_slot[last_slot];
-		element_slot[last_slot] = (ec & BOA__MAP_LOWMASK) | (element_ix << BOA__MAP_LOWBITS);
+		uint16_t es = element_slot[last_slot];
+		element_slot[last_slot] = (es & BOA__MAP_LOWMASK) | (element_ix << BOA__MAP_LOWBITS);
 		hash_cur_slot[element_ix] = hash_cur_slot[count];
 
 		uint32_t last_element = boa__map_element_from_block(map, block_ix, count);
@@ -469,16 +469,39 @@ uint32_t boa_map_erase(boa_map *map, uint32_t element)
 		void *src = boa__map_kv_from_element(map, last_element);
 		memcpy(dst, src, map->impl.kv_size);
 
-		return element;
+		result = element;
 	} else {
 		block_ix++;
 		while (block_ix < map->impl.num_used_blocks) {
 			if (block[block_ix].count != 0) {
-				return block_ix * map->impl.block_num_elements;
+				result = block_ix * map->impl.block_num_elements;
+				break;
 			}
 			block_ix++;
 		}
-		return ~0u;
+	}
+
+	uint32_t slot_mask = map->impl.block_num_slots - 1;
+
+	// Shift back following entries
+	for (;;) {
+		uint32_t next_slot_ix = (slot_ix + 1) & slot_mask;
+		uint16_t es = element_slot[next_slot_ix];
+
+		uint32_t scan = boa__es_scan_distance(es, next_slot_ix, slot_mask);
+		if (es == 0 || scan == 0) {
+			element_slot[slot_ix] = 0;
+			return result;
+		}
+
+		element_slot[slot_ix] = es;
+
+		uint32_t element_offset = boa__es_element_offset(es);
+		uint32_t element = boa__map_element_from_block(map, block_ix, element_offset);
+		uint32_t hcs = map->impl.hash_cur_slot[element];
+		map->impl.hash_cur_slot[element] = boa__hcs_set_slot(hcs, slot_ix);
+
+		slot_ix = next_slot_ix;
 	}
 }
 
