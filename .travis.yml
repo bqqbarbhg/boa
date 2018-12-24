@@ -3,8 +3,8 @@ sudo: false
 language: cpp
 
 script:
-    - clang test/test.cpp -Isrc -o test_cpp
-    - clang test/test.c -Isrc -o test_c
+    - clang test/test.cpp -Isrc -std=c++11 -o test_cpp
+    - clang test/test.c -Isrc -std=c99 -o test_c
     - ./test_cpp
     - ./test_c
 
