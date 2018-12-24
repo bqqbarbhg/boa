@@ -19,13 +19,19 @@ void insert_int(boa_map *map, int k, int v)
 int find_int(boa_map *map, int k)
 {
 	uint32_t elem = boa_map_find_inline(map, &k, int_hash(k), &int_cmp);
-	return elem != ~0u ? *boa_val(int, map, elem) : -1;
+	if (elem != ~0u) {
+		boa_assert(*boa_key(int, map, elem) == k);
+		return *boa_val(int, map, elem);
+	} else {
+		return -1;
+	}
 }
 
 void erase_int(boa_map *map, int k)
 {
 	uint32_t elem = boa_map_find_inline(map, &k, int_hash(k), &int_cmp);
 	if (elem != ~0u) {
+		boa_assert(*boa_key(int, map, elem) == k);
 		boa_map_erase(map, elem);
 	}
 }
@@ -360,6 +366,44 @@ BOA_TEST(map_erase_insert_loop, "Insert + erase loop should not reallocate")
 	boa_map_reset(map);
 }
 
+BOA_TEST(map_insert_alloc_fail, "Insert should fail gracefully")
+{
+	boa_map mapv = { 0 }, *map = &mapv;
+	boa_test_allocator ator = boa_test_allocator_make();
+	map->key_size = sizeof(int);
+	map->val_size = sizeof(int);
+
+	boa_map_reserve(map, 16);
+
+	boa_test_fail_next_allocation();
+	uint32_t inserted_until = 0;
+
+	for (uint32_t i = 0; i < 64; i++) {
+		int had_space = (map->count < map->capacity) ? 1 : 0;
+		int key = (int)i;
+		uint32_t hash = int_hash(key);
+		uint32_t element = boa_map_insert(map, &key, hash, &int_cmp);
+		if (had_space) {
+			*boa_key(int, map, element) = i;
+			*boa_val(int, map, element) = i * i;
+			boa_assert(element != ~0u);
+		} else {
+			boa_assert(element == ~0u);
+			inserted_until = i;
+			break;
+		}
+	}
+
+	boa_assert(inserted_until > 0);
+	boa_assert(map->count == inserted_until);
+
+	for (uint32_t i = 0; i < inserted_until; i++) {
+		boa_assert(find_int(map, i) == i * i);
+	}
+
+	boa_map_reset(map);
+}
+
 BOA_TEST_BEGIN_PERMUTATION_U32(g_hash_factor, hash_factors_no_zero)
 
 BOA_TEST(map_large, "Insert a large amount of keys")
@@ -378,4 +422,43 @@ BOA_TEST(map_large, "Insert a large amount of keys")
 
 BOA_TEST_END_PERMUTATION(g_hash_factor)
 BOA_TEST_END_PERMUTATION(g_do_reserve)
+
+BOA_TEST(map_insert_alloc_fail_fallback, "Insert should fail gracefully on aux block allocation")
+{
+	boa_map mapv = { 0 }, *map = &mapv;
+	boa_test_allocator ator = boa_test_allocator_make();
+	map->key_size = sizeof(int);
+	map->val_size = sizeof(int);
+
+	boa_map_reserve(map, 1024);
+
+	boa_test_fail_next_allocation();
+	uint32_t inserted_until = 0;
+
+	for (uint32_t i = 0; i < 1024; i++) {
+		boa_assert(map->count < map->capacity);
+		int key = (int)i;
+		uint32_t element = boa_map_insert(map, &key, 0, &int_cmp);
+		if (element != ~0u) {
+			*boa_key(int, map, element) = i;
+			*boa_val(int, map, element) = i * i;
+		} else {
+			inserted_until = i;
+			break;
+		}
+	}
+
+	boa_assert(inserted_until > 0);
+	boa_assert(map->count == inserted_until);
+
+	for (uint32_t i = 0; i < inserted_until; i++) {
+		int key = (int)i;
+		uint32_t elem = boa_map_find_inline(map, &key, 0, &int_cmp);
+		boa_assert(*boa_key(int, map, elem) == i);
+		boa_assert(*boa_val(int, map, elem) == i * i);
+	}
+
+	boa_map_reset(map);
+}
+
 
