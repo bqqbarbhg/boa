@@ -74,3 +74,21 @@ BOA_TEST(format_cat_realloc, "Format should handle reallocation in the middle of
 	boa_reset(&buf);
 }
 
+BOA_TEST(format_null, "Test boa_format_null")
+{
+	boa_buf buf = boa_empty_buf();
+	boa_format_null(&buf, NULL, 0);
+	boa_assert(buf.end_pos == 0);
+	boa_reset(&buf);
+}
+
+BOA_TEST(format_u32, "Test boa_format_u32")
+{
+	boa_buf buf = boa_empty_buf();
+	uint32_t value = 1234;
+	boa_format_u32(&buf, &value, 4);
+	boa_expect_assert( boa_format_u32(&buf, &value, 3) );
+	boa_assert(buf.end_pos == 4);
+	boa_assert(strcmp(boa_begin(char, &buf), "1234") == 0);
+	boa_reset(&buf);
+}
