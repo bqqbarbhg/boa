@@ -491,15 +491,20 @@ uint32_t boa_map_find(boa_map *map, const void *key, uint32_t hash, boa_cmp_fn c
 uint32_t boa_map_erase(boa_map *map, uint32_t element)
 {
 	uint32_t slot_ix = boa__hcs_current_slot(map->impl.hash_cur_slot[element]);
-	uint32_t block_ix = slot_ix >> BOA__MAP_BLOCK_SHIFT;
+	uint32_t block_ix = element >> map->impl.element_block_shift;
 	uint32_t element_ix = element & (map->impl.block_num_elements - 1);
 
 	uint32_t *hash_cur_slot = map->impl.hash_cur_slot + block_ix * map->impl.block_num_elements;
 	uint16_t *element_slot = map->impl.element_slot + block_ix * map->impl.block_num_slots;
 
 	boa__map_block *block = &map->impl.blocks[block_ix];
-	uint32_t count = block->count - 1;
+	uint32_t count = block->count;
+	boa_assert(map->count > 0);
+	boa_assert(count > 0);
+	count--;
 	block->count = count;
+
+	map->count--;
 
 	uint32_t result = ~0u;
 
@@ -518,13 +523,15 @@ uint32_t boa_map_erase(boa_map *map, uint32_t element)
 
 		result = element;
 	} else {
-		block_ix++;
-		while (block_ix < map->impl.num_used_blocks) {
-			if (block[block_ix].count != 0) {
-				result = block_ix * map->impl.block_num_elements;
+		boa__map_block *blocks = map->impl.blocks;
+		uint32_t next_block = block_ix;
+		next_block++;
+		while (next_block < map->impl.num_used_blocks) {
+			if (blocks[next_block].count != 0) {
+				result = next_block * map->impl.block_num_elements;
 				break;
 			}
-			block_ix++;
+			next_block++;
 		}
 	}
 
@@ -550,6 +557,8 @@ uint32_t boa_map_erase(boa_map *map, uint32_t element)
 
 		slot_ix = next_slot_ix;
 	}
+
+	return result;
 }
 
 uint32_t boa_map_begin(boa_map *map)

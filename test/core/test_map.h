@@ -30,20 +30,38 @@ void erase_int(boa_map *map, int k)
 	}
 }
 
+void init_square_map(boa_map *map, uint32_t count)
+{
+	map->key_size = sizeof(int);
+	map->val_size = sizeof(int);
+
+	if (g_do_reserve) {
+		boa_map_reserve(map, count);
+		boa_assert(map->capacity >= count);
+	}
+
+	for (uint32_t i = 0; i < count; i++)
+		insert_int(map, i, i * i);
+
+	boa_assert(map->count == count);
+}
+
 #else
 
 extern uint32_t g_hash_factor;
 extern int g_do_reserve;
 
 static uint32_t hash_factors[] = {
-	13, // < Provides reasonable hashing
-	1,  // < Degrades to linear
-	0,  // < Degrades to linked list
+	1051, // < Provides reasonable hashing
+	13,   // < Provides ok hashing
+	1,    // < Degrades to linear
+	0,    // < Degrades to linked list
 };
 
 static uint32_t hash_factors_no_zero[] = {
-	13, // < Provides reasonable hashing
-	1,  // < Degrades to linear
+	1051, // < Provides reasonable hashing
+	13,   // < Provides ok hashing
+	1,    // < Degrades to linear
 };
 
 static int reserve_values[] = {
@@ -108,20 +126,8 @@ BOA_TEST(map_simple_collision, "Simple manual hash collision test")
 BOA_TEST(map_medium, "Insert a medium amount of keys")
 {
 	boa_map mapv = { 0 }, *map = &mapv;
-	map->key_size = sizeof(int);
-	map->val_size = sizeof(int);
-
 	uint32_t count = 1000;
-
-	if (g_do_reserve) {
-		boa_map_reserve(map, count);
-		boa_assert(map->capacity >= count);
-	}
-
-	for (uint32_t i = 0; i < count; i++)
-		insert_int(map, i, i * i);
-
-	boa_assert(map->count == count);
+	init_square_map(map, count);
 
 	for (uint32_t i = 0; i < count; i++) {
 		boa_test_hint_u32(i);
@@ -149,11 +155,20 @@ BOA_TEST(map_erase_simple, "Erase values from a hash map")
 	erase_int(map, 2);
 	erase_int(map, 4);
 
+	boa_assert(map->count == 2);
+
 	boa_assert(find_int(map, 1) == 10);
 	boa_assert(find_int(map, 2) == -1);
 	boa_assert(find_int(map, 3) == 30);
 	boa_assert(find_int(map, 4) == -1);
 	boa_assert(find_int(map, 5) == -1);
+
+	uint32_t element = boa_map_begin(map);
+	boa_assert(element != ~0u);
+	element = boa_map_next(map, element);
+	boa_assert(element != ~0u);
+	element = boa_map_next(map, element);
+	boa_assert(element == ~0u);
 
 	boa_map_reset(map);
 }
@@ -196,20 +211,8 @@ BOA_TEST(map_iterate, "Iterating a small map")
 BOA_TEST(map_iterate_medium, "Iterate a medium amount of keys")
 {
 	boa_map mapv = { 0 }, *map = &mapv;
-	map->key_size = sizeof(int);
-	map->val_size = sizeof(int);
-
 	uint32_t count = 1000;
-
-	if (g_do_reserve) {
-		boa_map_reserve(map, count);
-		boa_assert(map->capacity >= count);
-	}
-
-	for (uint32_t i = 0; i < count; i++)
-		insert_int(map, i, i * i);
-
-	boa_assert(map->count == count);
+	init_square_map(map, count);
 
 	int visited_value[1000] = { 0 };
 	uint32_t num_visited = 0;
@@ -232,25 +235,54 @@ BOA_TEST(map_iterate_medium, "Iterate a medium amount of keys")
 	boa_map_reset(map);
 }
 
+BOA_TEST(map_erase_medium_find, "Erase a medium amount of keys by find")
+{
+	boa_map mapv = { 0 }, *map = &mapv;
+	uint32_t count = 1000;
+	init_square_map(map, count);
+
+	for (uint32_t i = 0; i < count; i++) {
+		boa_test_hint_u32(i);
+		int key = (int)i;
+		uint32_t hash = int_hash(key);
+		uint32_t element = boa_map_find(map, &key, hash, &int_cmp);
+		boa_assert(element != ~0u);
+		boa_map_erase(map, element);
+		boa_assert(map->count == count - i - 1);
+	}
+
+	boa_map_reset(map);
+}
+
+BOA_TEST(map_erase_medium_iterate, "Erase a medium amount of keys by iteration")
+{
+	boa_map mapv = { 0 }, *map = &mapv;
+	uint32_t count = 1000;
+	init_square_map(map, count);
+
+	uint32_t element = boa_map_begin(map);
+	uint32_t iter = 0;
+	while (element != ~0u) {
+		iter++;
+		boa_test_hint_u32(iter);
+		boa_test_hint_u32(element);
+		boa_assert(element % map->impl.block_num_elements == 0);
+		element = boa_map_erase(map, element);
+		boa_assert(map->count == count - iter);
+	}
+
+	boa_assert(iter == count);
+
+	boa_map_reset(map);
+}
+
 BOA_TEST_BEGIN_PERMUTATION_U32(g_hash_factor, hash_factors_no_zero)
 
 BOA_TEST(map_large, "Insert a large amount of keys")
 {
 	boa_map mapv = { 0 }, *map = &mapv;
-	map->key_size = sizeof(int);
-	map->val_size = sizeof(int);
-
-	uint32_t count = 10000;
-
-	if (g_do_reserve) {
-		boa_map_reserve(map, count);
-		boa_assert(map->capacity >= count);
-	}
-
-	for (uint32_t i = 0; i < count; i++)
-		insert_int(map, i, i * i);
-
-	boa_assert(map->count == count);
+	uint32_t count = 20000;
+	init_square_map(map, count);
 
 	for (uint32_t i = 0; i < count; i++) {
 		boa_test_hint_u32(i);

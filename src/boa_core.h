@@ -295,9 +295,9 @@ int boa_format_u32(boa_buf *buf, const void *data, size_t size);
 #define BOA__MAP_LOWBITS 10
 #define BOA__MAP_LOWMASK ((1 << BOA__MAP_LOWBITS) - 1)
 #define BOA__MAP_HIGHMASK (~(uint32_t)BOA__MAP_LOWMASK)
-#define BOA__MAP_BLOCK_SHIFT 7
-#define BOA__MAP_BLOCK_MAX_SLOTS (1 << BOA__MAP_BLOCK_SHIFT)
-#define BOA__MAP_BLOCK_MAX_ELEMENTS (1 << (16 - BOA__MAP_LOWBITS))
+#define BOA__MAP_BLOCK_SHIFT BOA__MAP_LOWBITS
+#define BOA__MAP_BLOCK_MAX_SLOTS 128
+#define BOA__MAP_BLOCK_MAX_ELEMENTS 64
 
 typedef struct boa__map_impl {
 	uint32_t kv_size;             // < Size of a key-value pair in bytes
