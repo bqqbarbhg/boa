@@ -315,6 +315,51 @@ BOA_TEST(map_erase_erase_odd, "Erase odd keys from a map")
 	boa_map_reset(map);
 }
 
+BOA_TEST(map_allocator, "Set allocator for map")
+{
+	boa_map mapv = { 0 }, *map = &mapv;
+	boa_test_allocator ator = boa_test_allocator_make();
+	map->ator = &ator.ator;
+	uint32_t count = 1000;
+	init_square_map(map, count);
+
+	boa_assert(ator.allocs >= 1);
+	boa_assert(ator.reallocs == 0);
+	boa_assert(ator.frees == ator.allocs - 1);
+
+	boa_map_reset(map);
+	boa_assert(ator.frees == ator.allocs);
+}
+
+BOA_TEST(map_erase_insert_loop, "Insert + erase loop should not reallocate")
+{
+	boa_map mapv = { 0 }, *map = &mapv;
+	boa_test_allocator ator = boa_test_allocator_make();
+	map->ator = &ator.ator;
+	map->key_size = sizeof(int);
+	map->val_size = sizeof(int);
+
+	boa_map_reserve(map, 16);
+
+	uint32_t capacity = map->capacity;
+	uint32_t allocs = ator.allocs;
+	uint32_t reallocs = ator.reallocs;
+
+	for (uint32_t i = 0; i < 10000; i++) {
+		int key = (int)i;
+		uint32_t hash = int_hash(key);
+		uint32_t element = boa_map_insert(map, &key, hash, &int_cmp);
+		boa_assert(element != ~0u);
+		boa_map_erase(map, element);
+	}
+
+	boa_assert(capacity == map->capacity);
+	boa_assert(allocs == ator.allocs);
+	boa_assert(reallocs == ator.reallocs);
+
+	boa_map_reset(map);
+}
+
 BOA_TEST_BEGIN_PERMUTATION_U32(g_hash_factor, hash_factors_no_zero)
 
 BOA_TEST(map_large, "Insert a large amount of keys")
