@@ -24,14 +24,18 @@
 
 #define boa_inline inline
 
-#if __cplusplus  >= 201103L
+#if BOA_SINGLETHREADED
+	#define boa_threadlocal
+#elif __cplusplus  >= 201103L
 	#define boa_threadlocal thread_local
 #elif __STDC_VERSION__ >= 201112L
 	#define boa_threadlocal _Thread_local
-#elif defined(_MSC_VER)
+#elif BOA_MSVC
 	#define boa_threadlocal __declspec(thread)
+#elif BOA_GNUC
+	#define boa_threadlocal __thread
 #else
-	#error "Unsupported platform/"
+	#error "Unsupported platform"
 #endif
 
 // -- boa_assert
