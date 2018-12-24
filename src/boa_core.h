@@ -278,7 +278,6 @@ void *boa_buf_insert(boa_buf *buf, uint32_t pos, uint32_t size);
 #define boa_erase(type, buf, pos) boa_buf_erase((buf), (pos) * sizeof(type), sizeof(type))
 #define boa_erase_n(type, buf, pos, n) boa_buf_erase((buf), (pos) * sizeof(type), (n) * sizeof(type))
 
-
 #define boa_bytesleft(buf) ((buf)->cap_pos - (buf)->end_pos)
 
 #define boa_for(type, name, buf) for (type *name = boa_begin(type, buf), *name##__end = boa_end(type, buf); name != name##__end; name++)

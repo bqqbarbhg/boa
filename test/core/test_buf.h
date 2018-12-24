@@ -650,3 +650,20 @@ BOA_TEST(buf_shorthand_pop, "Shorthand for pop")
 	boa_reset(&buf);
 }
 
+BOA_TEST(buf_shorthand_for, "Shorthand for for")
+{
+	boa_buf buf = boa_empty_buf();
+	boa_push_val(int, &buf, 10);
+	boa_push_val(int, &buf, 20);
+	boa_push_val(int, &buf, 30);
+
+	uint32_t index = 0;
+	boa_for (int, val, &buf) {
+		boa_test_hint_u32(index);
+		boa_assert(*val == boa_get(int, &buf, index));
+		index++;
+	}
+
+	boa_reset(&buf);
+}
+
