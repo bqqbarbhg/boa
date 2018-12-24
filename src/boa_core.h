@@ -17,8 +17,6 @@
 #include <stddef.h>
 #include <string.h>
 
-#include <intrin.h>
-
 #define boa_arraycount(arr) (sizeof(arr) / sizeof(*(arr)))
 #define boa_arrayend(arr) (arr + (sizeof(arr) / sizeof(*(arr))))
 
