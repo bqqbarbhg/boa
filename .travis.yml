@@ -4,7 +4,7 @@ language: cpp
 
 script:
     - clang test/test.cpp -Isrc -std=c++11 -Wno-unused-value -o test_cpp
-    - clang test/test.c -Isrc -std=c99 -o test_c
+    - clang test/test.c -Isrc -std=c99 -Wno-unused-value -o test_c
     - ./test_cpp
     - ./test_c
 
