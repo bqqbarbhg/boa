@@ -22,7 +22,11 @@
 
 // -- Platform
 
-#define boa_inline inline
+#if defined(__cplusplus)
+	#define boa_inline inline
+#else
+	#define boa_inline
+#endif
 
 #if BOA_SINGLETHREADED
 	#define boa_threadlocal
