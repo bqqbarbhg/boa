@@ -469,6 +469,37 @@ BOA_TEST(buf_get, "Buf get should return bounds checked pointer")
 	boa_reset(&buf);
 }
 
+BOA_TEST(buf_pop_simple, "Pop should work for single element")
+{
+	boa_buf buf = boa_empty_buf();
+	int *data = (int*)boa_buf_push(&buf, 2 * sizeof(int));
+	int *ptr;
+	data[0] = 10;
+	data[1] = 20;
+
+	ptr = (int*)boa_buf_pop(&buf, sizeof(int));
+	boa_assert(data[0] == 10);
+	boa_assert(ptr[0] == 20);
+	boa_assert(buf.end_pos == sizeof(int));
+	ptr = (int*)boa_buf_pop(&buf, sizeof(int));
+	boa_assert(buf.end_pos == 0);
+	boa_assert(ptr[0] == 10);
+
+	boa_reset(&buf);
+}
+
+BOA_TEST(buf_pop_assert, "Pop should assert when popping more than size")
+{
+	boa_buf buf = boa_empty_buf();
+	boa_assert(boa_buf_push(&buf, 2 * sizeof(int)) != NULL);
+
+	boa_expect_assert( boa_buf_pop(&buf, 3 * sizeof(int)) );
+
+	boa_assert( boa_buf_pop(&buf, 2 * sizeof(int)) != NULL );
+
+	boa_reset(&buf);
+}
+
 BOA_TEST(buf_shorthands_simple, "Simple buffer shorthand test")
 {
 	int arr[2];
@@ -600,6 +631,21 @@ BOA_TEST(buf_shorthand_erase, "Shorthand for erase")
 	boa_erase_n(int, &buf, 0, 2);
 
 	boa_assert(buf.end_pos == 0);
+
+	boa_reset(&buf);
+}
+
+BOA_TEST(buf_shorthand_pop, "Shorthand for pop")
+{
+	boa_buf buf = boa_empty_buf();
+	boa_push_val(int, &buf, 10);
+	boa_push_val(int, &buf, 20);
+	boa_push_val(int, &buf, 30);
+
+	boa_assert(boa_pop(int, &buf) == 30);
+	int *ptr = boa_pop_n(int, &buf, 2);
+	boa_assert(ptr[0] == 10);
+	boa_assert(ptr[1] == 20);
 
 	boa_reset(&buf);
 }

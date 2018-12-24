@@ -223,7 +223,7 @@ boa_inline void boa_buf_erase(boa_buf *buf, uint32_t offset, uint32_t size)
 boa_inline void *boa_buf_pop(boa_buf *buf, uint32_t size)
 {
 	char *data = (char*)buf->data;
-	boa_assert(size >= buf->end_pos);
+	boa_assert(size <= buf->end_pos);
 	buf->end_pos -= size;
 	return data + buf->end_pos;
 }
@@ -258,13 +258,15 @@ void *boa_buf_insert(boa_buf *buf, uint32_t pos, uint32_t size);
 #define boa_bump(type, buf) boa_buf_bump((buf), sizeof(type))
 #define boa_push(type, buf) (type*)boa_buf_push((buf), sizeof(type))
 #define boa_insert(type, buf, pos) (type*)boa_buf_insert((buf), (pos) * sizeof(type), sizeof(type))
-#define boa_pop(type, buf) (type*)boa_buf_pop((buf), sizeof(type))
+#define boa_pop(type, buf) (*(type*)boa_buf_pop((buf), sizeof(type)))
+#define boa_get(type, buf, pos) (*(type*)boa_buf_get((buf), (pos) * sizeof(type), sizeof(type)))
 
 #define boa_reserve_n(type, buf, n) (type*)boa_buf_reserve((buf), (n) * sizeof(type))
 #define boa_bump_n(type, buf, n) boa_buf_bump((buf), (n) * sizeof(type))
 #define boa_push_n(type, buf, n) (type*)boa_buf_push((buf), (n) * sizeof(type))
 #define boa_insert_n(type, buf, pos, n) (type*)boa_buf_insert((buf), (pos) * sizeof(type), (n) * sizeof(type))
-#define boa_pop_n(type, buf) (type*)boa_buf_pop((buf), (n) * sizeof(type))
+#define boa_pop_n(type, buf, n) (type*)boa_buf_pop((buf), (n) * sizeof(type))
+#define boa_get_n(type, buf, pos, n) ((type*)boa_buf_get((buf), (pos) * sizeof(type), (n) * sizeof(type)))
 
 #define boa_is_empty(buf) ((buf)->end_pos == 0)
 #define boa_non_empty(buf) ((buf)->end_pos > 0)
@@ -276,8 +278,6 @@ void *boa_buf_insert(boa_buf *buf, uint32_t pos, uint32_t size);
 #define boa_erase(type, buf, pos) boa_buf_erase((buf), (pos) * sizeof(type), sizeof(type))
 #define boa_erase_n(type, buf, pos, n) boa_buf_erase((buf), (pos) * sizeof(type), (n) * sizeof(type))
 
-#define boa_get(type, buf, pos) (*(type*)boa_buf_get((buf), (pos) * sizeof(type), sizeof(type)))
-#define boa_get_n(type, buf, pos, n) ((type*)boa_buf_get((buf), (pos) * sizeof(type), (n) * sizeof(type)))
 
 #define boa_bytesleft(buf) ((buf)->cap_pos - (buf)->end_pos)
 
