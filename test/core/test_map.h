@@ -276,6 +276,45 @@ BOA_TEST(map_erase_medium_iterate, "Erase a medium amount of keys by iteration")
 	boa_map_reset(map);
 }
 
+BOA_TEST(map_erase_erase_odd, "Erase odd keys from a map")
+{
+	boa_map mapv = { 0 }, *map = &mapv;
+	uint32_t count = 1000;
+	init_square_map(map, count);
+
+	uint32_t element = boa_map_begin(map);
+	uint32_t iter = 0;
+	while (element != ~0u) {
+		iter++;
+		boa_test_hint_u32(iter);
+		boa_test_hint_u32(element);
+
+		int key = *boa_key(int, map, element);
+		if (key % 2 == 1) {
+			element = boa_map_erase(map, element);
+		} else {
+			element = boa_map_next(map, element);
+		}
+	}
+
+	boa_assert(iter == count);
+	boa_assert(map->count == count / 2);
+
+	iter = 0;
+	element = boa_map_begin(map);
+	for (; element != ~0u; element = boa_map_next(map, element)) {
+		iter++;
+		boa_test_hint_u32(iter);
+		boa_test_hint_u32(element);
+		int key = *boa_key(int, map, element);
+		boa_assert(key % 2 == 0);
+	}
+
+	boa_assert(iter == map->count);
+
+	boa_map_reset(map);
+}
+
 BOA_TEST_BEGIN_PERMUTATION_U32(g_hash_factor, hash_factors_no_zero)
 
 BOA_TEST(map_large, "Insert a large amount of keys")
