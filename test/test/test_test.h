@@ -12,7 +12,7 @@ BOA_TEST(expect_assert_fail, "Expect assert without assertion")
 	boa_expect_assert( boa_expect_assert( x = 5 ) );
 }
 
-BOA_TEST(test_alloc_fail, "boa_alloc() should fail in tests when requested")
+BOA_TEST(alloc_fail, "boa_alloc() should fail in tests when requested")
 {
 	void *allocs[2];
 
@@ -26,7 +26,7 @@ BOA_TEST(test_alloc_fail, "boa_alloc() should fail in tests when requested")
 	boa_free(allocs[1]);
 }
 
-BOA_TEST(test_alloc_fail_complex, "boa_alloc() should fail with complex pattern")
+BOA_TEST(alloc_fail_complex, "boa_alloc() should fail with complex pattern")
 {
 	void *allocs[4];
 
@@ -45,7 +45,7 @@ BOA_TEST(test_alloc_fail_complex, "boa_alloc() should fail with complex pattern"
 	boa_free(allocs[3]);
 }
 
-BOA_TEST(test_realloc_fail, "boa_realloc() should fail in tests when requested")
+BOA_TEST(realloc_fail, "boa_realloc() should fail in tests when requested")
 {
 	void *allocs[2], *reallocs[2];
 
@@ -65,7 +65,7 @@ BOA_TEST(test_realloc_fail, "boa_realloc() should fail in tests when requested")
 	boa_free(reallocs[1]);
 }
 
-BOA_TEST(test_realloc_fail_complex, "boa_realloc() should fail with complex pattern")
+BOA_TEST(realloc_fail_complex, "boa_realloc() should fail with complex pattern")
 {
 	void *allocs[4], *reallocs[4];
 	allocs[0] = boa_alloc(16);
@@ -103,7 +103,7 @@ BOA_TEST(memory_leak_realloc, "Tests should catch memory leaks after realloc")
 	ptr = boa_realloc(ptr, 128);
 }
 
-BOA_TEST(test_allocator, "Test allocator should count allocations")
+BOA_TEST(allocator, "Test allocator should count allocations")
 {
 	boa_test_allocator ator = boa_test_allocator_make();
 
@@ -124,7 +124,7 @@ BOA_TEST(test_allocator, "Test allocator should count allocations")
 	boa_assert(ator.frees == 2);
 }
 
-BOA_TEST(test_allocator_fail, "Test allocator count failed allocations")
+BOA_TEST(allocator_fail, "Test allocator count failed allocations")
 {
 	boa_test_allocator ator = boa_test_allocator_make();
 

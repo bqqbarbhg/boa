@@ -31,7 +31,7 @@ BOA_TEST(check_ptr_null, "Check NULL pointer")
 	boa_expect_assert( boa_check_ptr(NULL) );
 }
 
-BOA_TEST(test_align_up, "boa_align_up() should work for powers of two")
+BOA_TEST(align_up, "boa_align_up() should work for powers of two")
 {
 	boa_assert(boa_align_up(0, 4) == 0);
 	boa_assert(boa_align_up(1, 4) == 4);
@@ -43,7 +43,7 @@ BOA_TEST(test_align_up, "boa_align_up() should work for powers of two")
 	boa_assert(boa_align_up(17, 8) == 24);
 }
 
-BOA_TEST(test_align_fuzz, "Test boa_align_up() results for sanity")
+BOA_TEST(align_fuzz, "Test boa_align_up() results for sanity")
 {
 	for (uint32_t align = 1; align <= 4096; align <<= 1) {
 		boa_test_hint_u32(align);
@@ -56,7 +56,7 @@ BOA_TEST(test_align_fuzz, "Test boa_align_up() results for sanity")
 	}
 }
 
-BOA_TEST(test_align_assert, "boa_align_up() should assert for non power of two alignments")
+BOA_TEST(align_assert, "boa_align_up() should assert for non power of two alignments")
 {
 	boa_expect_assert( boa_align_up(4, 0) );
 	boa_expect_assert( boa_align_up(4, 3) );
@@ -64,7 +64,7 @@ BOA_TEST(test_align_assert, "boa_align_up() should assert for non power of two a
 	boa_expect_assert( boa_align_up(4, 17) );
 }
 
-BOA_TEST(test_pow2_round, "Test boa_round_pow2_up() results for sanity")
+BOA_TEST(pow2_round, "Test boa_round_pow2_up() results for sanity")
 {
 	boa_assert(boa_round_pow2_up(0) == 0);
 	boa_assert(boa_round_pow2_up(1) == 1);
@@ -75,7 +75,7 @@ BOA_TEST(test_pow2_round, "Test boa_round_pow2_up() results for sanity")
 	boa_assert(boa_round_pow2_up(100) == 128);
 }
 
-BOA_TEST(test_pow2_round_fuzz, "boa_round_pow2_up() should round to the next power of two")
+BOA_TEST(pow2_round_fuzz, "boa_round_pow2_up() should round to the next power of two")
 {
 	for (uint32_t i = 1; i < 100000; i++) {
 		boa_test_hint_u32(i);
@@ -85,7 +85,7 @@ BOA_TEST(test_pow2_round_fuzz, "boa_round_pow2_up() should round to the next pow
 	}
 }
 
-BOA_TEST(test_highest_bit, "boa_highest_bit() should find highest bit set")
+BOA_TEST(highest_bit, "boa_highest_bit() should find highest bit set")
 {
 	boa_assert(boa_highest_bit(1) == 0);
 	boa_assert(boa_highest_bit(3) == 1);
@@ -98,7 +98,7 @@ BOA_TEST(test_highest_bit, "boa_highest_bit() should find highest bit set")
 	boa_assert(boa_highest_bit(UINT32_MAX) == 31);
 }
 
-BOA_TEST(test_highest_bit_fuzz, "Test boa_highest_bit() results for sanity")
+BOA_TEST(highest_bit_fuzz, "Test boa_highest_bit() results for sanity")
 {
 	for (uint32_t i = 1; i < 100000; i++) {
 		boa_test_hint_u32(i);
@@ -108,7 +108,7 @@ BOA_TEST(test_highest_bit_fuzz, "Test boa_highest_bit() results for sanity")
 	}
 }
 
-BOA_TEST(test_highest_bit_assert, "boa_highest_bit() should assert on zero")
+BOA_TEST(highest_bit_assert, "boa_highest_bit() should assert on zero")
 {
 	boa_expect_assert( boa_highest_bit(0) );
 }
