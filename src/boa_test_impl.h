@@ -81,6 +81,7 @@ typedef struct boa__test_alloc_hdr {
 boa__test_alloc_hdr boa__test_alloc_head;
 
 boa_buf boa__test_active_permutations;
+boa_buf boa__test_active_hints;
 
 void boa_test_add(void (*test_fn)(), const char *name, const char *desc, const char *file, int line)
 {
@@ -99,7 +100,7 @@ void boa_test_add(void (*test_fn)(), const char *name, const char *desc, const c
 	}
 }
 
-void boa_test_set_permutation(void *ptr, const char *name, const void *values, size_t num, size_t value_size)
+void boa_test_set_permutation(void *ptr, const char *name, const void *values, size_t num, size_t value_size, boa_format_fn format)
 {
 	boa_buf *active = &boa__test_active_permutations;
 	boa_buf_set_ator(active, boa_test_original_ator());
@@ -126,6 +127,7 @@ void boa_test_set_permutation(void *ptr, const char *name, const void *values, s
 		p->values = values;
 		p->num = (uint32_t)num;
 		p->value_size = (uint32_t)value_size;
+		p->format_fn = format;
 	}
 }
 
@@ -150,6 +152,8 @@ boa_test *boa_test_get_all(size_t *count)
 
 static int boa__test_run_permutation(const boa_test *test, boa_test_fail *fail)
 {
+	boa_clear(&boa__test_active_hints);
+
 	int status = 0;
 	if (!setjmp(boa__test_jmp)) {
 		test->test_fn();
@@ -196,6 +200,11 @@ static int boa__test_run_permutation(const boa_test *test, boa_test_fail *fail)
 		} else {
 			status = 1;
 		}
+	}
+
+	if (status == 0) {
+		boa_buf_set_ator(&fail->hints, boa_test_original_ator());
+		boa_buf_push_buf(boa_clear(&fail->hints), &boa__test_active_hints);
 	}
 
 	boa__test_alloc_fail_delay = 0;
@@ -249,6 +258,51 @@ void boa__test_do_fail(const char *file, int line, const char *expr, char *desc)
 		boa__current_fail.expression = expr;
 		boa__current_fail.description = desc;
 		longjmp(boa__test_jmp, 1);
+	}
+}
+
+void boa_test_add_hint(const char *name, const void *value, size_t size, boa_format_fn format)
+{
+	boa_buf_set_ator(&boa__test_active_hints, boa_test_original_ator());
+
+	boa_test_hint *hint = NULL;
+	boa_for (boa_test_hint, h, &boa__test_active_hints) {
+		if (strcmp(h->name, name)) continue;
+		hint = h;
+
+		if (hint->size != size) {
+			void *ptr = boa_realloc_ator(boa_test_original_ator(), hint->value, size);
+			if (!ptr) {
+				// Failed to reallocate hint, remove it from the list
+				size_t index = hint - boa_begin(boa_test_hint, &boa__test_active_hints);
+				boa_free_ator(boa_test_original_ator(), ptr);
+				boa_erase(boa_test_hint, &boa__test_active_hints, (uint32_t)index);
+				return;
+			}
+
+			hint->value = ptr;
+			hint->size = size;
+		}
+
+		break;
+	}
+
+	if (hint == NULL) {
+		hint = boa_push(boa_test_hint, &boa__test_active_hints);
+		hint->name = name;
+		if (hint) {
+			hint->size = size;
+			hint->value = boa_alloc_ator(boa_test_original_ator(), size);
+			if (!hint->value) {
+				boa_pop(boa_test_hint, &boa__test_active_hints);
+				hint = NULL;
+			}
+		}
+	}
+
+	if (hint) {
+		hint->format_fn = format;
+		memcpy(hint->value, value, size);
 	}
 }
 

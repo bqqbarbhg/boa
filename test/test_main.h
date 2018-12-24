@@ -39,13 +39,14 @@ int main(int argc, char **argv)
 
 	boa_allocator *original = boa_test_original_ator();
 
-	char namebuf_data[128];
-	boa_buf namebuf = boa_array_buf_ator(namebuf_data, original);
+	char fmtbuf_data[128];
+	boa_buf fmtbuf = boa_array_buf_ator(fmtbuf_data, original);
+
+	boa_test_fail fail = { 0 };
 
 	int num_ran = 0;
 	tests = boa_test_get_all(&num);
 	for (i = 0; i < num; i++) {
-		boa_test_fail fail;
 		boa_test *test = &tests[i];
 
 		if (test_filter) {
@@ -53,7 +54,7 @@ int main(int argc, char **argv)
 		}
 		num_ran++;
 
-		printf("%s %s: ", boa_format(boa_clear(&namebuf), "[%s]", test->name), test->description);
+		printf("%s %s: ", boa_format(boa_clear(&fmtbuf), "[%s]", test->name), test->description);
 		fflush(stdout);
 		int status = boa_test_run(test, &fail, permutation_filter);
 		if (status) {
@@ -85,19 +86,27 @@ int main(int argc, char **argv)
 			}
 
 			boa_for (boa_test_permutation, p, &test->permutations) {
-				printf("    ... %s: index %u\n", p->name, p->index);
+				const void *value = (const char*)p->values + p->index * p->value_size;
+				if (p->format_fn(boa_clear(&fmtbuf), value, p->value_size)) {
+					printf("    ... %s = %s (index %u)\n", p->name, boa_begin(char, &fmtbuf), p->index);
+				}
+			}
+
+			boa_for (boa_test_hint, h, &fail.hints) {
+				if (h->format_fn(boa_clear(&fmtbuf), h->value, h->size)) {
+					printf("    ... %s = %s\n", h->name, boa_begin(char, &fmtbuf));
+				}
 			}
 
 			printf("\n");
 		}
 	}
 
-	boa_reset(&namebuf);
+	boa_reset(&fail.hints);
+	boa_reset(&fmtbuf);
 
 	printf("\n");
 	printf("Tests passed: %d / %d\n", num_pass, num_ran);
 
 	return num_pass == num_ran ? 0 : 1;
 }
-
-

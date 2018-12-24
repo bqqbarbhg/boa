@@ -3,7 +3,11 @@
 #ifndef BOA__CORE_INCLUDED
 #define BOA__CORE_INCLUDED
 
+#include <stdint.h>
+
 // -- Platform
+
+#if !defined(BOA_GENERIC)
 
 #if defined(_MSC_VER)
 	#define BOA_MSVC 1
@@ -11,9 +15,16 @@
 	#define BOA_GNUC 1
 #endif
 
+#if UINTPTR_MAX == UINT64_MAX
+	#define BOA_64BIT
+#elif UINTPTR_MAX == UINT32_MAX
+	#define BOA_32BIT
+#endif
+
+#endif // !defined(BOA_GENERIC)
+
 // -- General helpers
 
-#include <stdint.h>
 #include <stddef.h>
 #include <string.h>
 
@@ -65,6 +76,7 @@ boa_inline void *boa_check_ptr(const void *ptr)
 
 boa_inline uint32_t boa_align_up(uint32_t value, uint32_t align)
 {
+	boa_assert(align != 0 && (align & align - 1) == 0);
 	return (value + align - 1) & ~(align - 1);
 }
 
@@ -208,12 +220,17 @@ boa_inline void boa_buf_erase(boa_buf *buf, uint32_t offset, uint32_t size)
 	buf->end_pos = end_pos - size;
 }
 
+boa_inline void *boa_buf_pop(boa_buf *buf, uint32_t size)
+{
+	char *data = (char*)buf->data;
+	boa_assert(size >= buf->end_pos);
+	buf->end_pos -= size;
+	return data + buf->end_pos;
+}
+
 int boa_buf_set_ator(boa_buf *buf, boa_allocator *ator);
 
 void *boa_buf_insert(boa_buf *buf, uint32_t pos, uint32_t size);
-
-
-char *boa_format(boa_buf *buf, const char *fmt, ...);
 
 #define boa_empty_buf_ator(ator) boa_buf_make(NULL, 0, (ator))
 #define boa_range_buf_ator(begin, end, ator) boa_buf_make((begin), (uint32_t)((char*)(end) - (char*)(begin)), (ator))
@@ -241,11 +258,13 @@ char *boa_format(boa_buf *buf, const char *fmt, ...);
 #define boa_bump(type, buf) boa_buf_bump((buf), sizeof(type))
 #define boa_push(type, buf) (type*)boa_buf_push((buf), sizeof(type))
 #define boa_insert(type, buf, pos) (type*)boa_buf_insert((buf), (pos) * sizeof(type), sizeof(type))
-#define boa_reserve_n(type, buf, n) (type*)boa_buf_reserve((buf), (n) * sizeof(type))
+#define boa_pop(type, buf) (type*)boa_buf_pop((buf), sizeof(type))
 
+#define boa_reserve_n(type, buf, n) (type*)boa_buf_reserve((buf), (n) * sizeof(type))
 #define boa_bump_n(type, buf, n) boa_buf_bump((buf), (n) * sizeof(type))
 #define boa_push_n(type, buf, n) (type*)boa_buf_push((buf), (n) * sizeof(type))
 #define boa_insert_n(type, buf, pos, n) (type*)boa_buf_insert((buf), (pos) * sizeof(type), (n) * sizeof(type))
+#define boa_pop_n(type, buf) (type*)boa_buf_pop((buf), (n) * sizeof(type))
 
 #define boa_is_empty(buf) ((buf)->end_pos == 0)
 #define boa_non_empty(buf) ((buf)->end_pos > 0)
@@ -263,6 +282,14 @@ char *boa_format(boa_buf *buf, const char *fmt, ...);
 #define boa_bytesleft(buf) ((buf)->cap_pos - (buf)->end_pos)
 
 #define boa_for(type, name, buf) for (type *name = boa_begin(type, buf), *name##__end = boa_end(type, buf); name != name##__end; name++)
+
+// -- boa_format
+
+char *boa_format(boa_buf *buf, const char *fmt, ...);
+
+typedef int (*boa_format_fn)(boa_buf *buf, const void *data, size_t size);
+int boa_format_null(boa_buf *buf, const void *data, size_t size);
+int boa_format_u32(boa_buf *buf, const void *data, size_t size);
 
 // -- boa_map
 

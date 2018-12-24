@@ -52,8 +52,8 @@ static int reserve_values[] = {
 
 #endif
 
-BOA_TEST_BEGIN_PERMUTATION(g_hash_factor, hash_factors)
-BOA_TEST_BEGIN_PERMUTATION(g_do_reserve, reserve_values)
+BOA_TEST_BEGIN_PERMUTATION_U32(g_hash_factor, hash_factors)
+BOA_TEST_BEGIN_PERMUTATION_U32(g_do_reserve, reserve_values)
 
 BOA_TEST(map_simple, "Simple manual map test")
 {
@@ -123,8 +123,10 @@ BOA_TEST(map_medium, "Insert a medium amount of keys")
 
 	boa_assert(map->count == count);
 
-	for (uint32_t i = 0; i < count; i++)
+	for (uint32_t i = 0; i < count; i++) {
+		boa_test_hint_u32(i);
 		boa_assertf(find_int(map, i) == i * i, "Index: %i", i);
+	}
 
 	boa_map_reset(map);
 }
@@ -174,6 +176,7 @@ BOA_TEST(map_iterate, "Iterating a small map")
 
 	uint32_t element = boa_map_begin(map);
 	for (; element != ~0u; element = boa_map_next(map, element)) {
+		boa_test_hint_u32(element);
 		int key = *boa_key(int, map, element);
 		int val = *boa_val(int, map, element);
 		boa_assertf(key >= 0 && key < 6, "Key out of range: %d", key);
@@ -222,13 +225,14 @@ BOA_TEST(map_iterate_medium, "Iterate a medium amount of keys")
 	boa_assertf(num_visited == count, "num_visited == %u", num_visited);
 
 	for (uint32_t i = 0; i < count; i++) {
-		boa_assertf(visited_value[i] == i * i, "Index %u", i);
+		boa_test_hint_u32(i);
+		boa_assert(visited_value[i] == i * i);
 	}
 
 	boa_map_reset(map);
 }
 
-BOA_TEST_BEGIN_PERMUTATION(g_hash_factor, hash_factors_no_zero)
+BOA_TEST_BEGIN_PERMUTATION_U32(g_hash_factor, hash_factors_no_zero)
 
 BOA_TEST(map_large, "Insert a large amount of keys")
 {
@@ -248,8 +252,10 @@ BOA_TEST(map_large, "Insert a large amount of keys")
 
 	boa_assert(map->count == count);
 
-	for (uint32_t i = 0; i < count; i++)
-		boa_assertf(find_int(map, i) == i * i, "Index: %i", i);
+	for (uint32_t i = 0; i < count; i++) {
+		boa_test_hint_u32(i);
+		boa_assert(find_int(map, i) == i * i);
+	}
 
 	boa_map_reset(map);
 }

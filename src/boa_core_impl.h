@@ -29,6 +29,8 @@ uint32_t boa_round_pow2_up(uint32_t value)
 
 uint32_t boa_highest_bit(uint32_t value)
 {
+	boa_assert(value != 0);
+
 #if BOA_MSVC
 	unsigned long result;
 	_BitScanReverse(&result, value);
@@ -248,6 +250,17 @@ char *boa_format(boa_buf *buf, const char *fmt, ...)
 	ptr[len] = '\0';
 	boa_buf_bump(buf, len);
 	return ptr;
+}
+
+int boa_format_null(boa_buf *buf, const void *data, size_t size)
+{
+	return 1;
+}
+
+int boa_format_u32(boa_buf *buf, const void *data, size_t size)
+{
+	boa_assert(size == sizeof(uint32_t));
+	return boa_format(buf, "%u", *(const uint32_t*)data) ? 1 : 0;
 }
 
 static void boa__map_insert_no_find(boa_map *map, uint32_t hash, const void *data)
