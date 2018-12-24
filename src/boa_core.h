@@ -242,6 +242,8 @@ char *boa_format(boa_buf *buf, const char *fmt, ...);
 #define boa_push(type, buf) (type*)boa_buf_push((buf), sizeof(type))
 #define boa_insert(type, buf, pos) (type*)boa_buf_insert((buf), (pos) * sizeof(type), sizeof(type))
 #define boa_reserve_n(type, buf, n) (type*)boa_buf_reserve((buf), (n) * sizeof(type))
+
+#define boa_bump_n(type, buf, n) boa_buf_bump((buf), (n) * sizeof(type))
 #define boa_push_n(type, buf, n) (type*)boa_buf_push((buf), (n) * sizeof(type))
 #define boa_insert_n(type, buf, pos, n) (type*)boa_buf_insert((buf), (pos) * sizeof(type), (n) * sizeof(type))
 

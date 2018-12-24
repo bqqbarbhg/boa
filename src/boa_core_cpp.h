@@ -65,7 +65,7 @@ struct buf: boa_buf {
 
 	T *reserve_n(uint32_t count) { return boa_reserve_n(T, this, count); }
 	T *push_n(uint32_t count) { return boa_push_n(T, this, count); }
-	void bump_n(uint32_t count) { return boa_bump_n(T, this, count); }
+	void bump_n(uint32_t count) { boa_bump_n(T, this, count); }
 	T *insert_n(uint32_t pos, uint32_t count) { return boa_insert_n(T, this, pos, count); }
 
 	void remove(uint32_t pos) { boa_remove(T, this, pos); }
