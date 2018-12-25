@@ -478,18 +478,51 @@ uint32_t boa__map_find_fallback(boa_map *map, uint32_t block_ix)
 	return block_ix;
 }
 
-uint32_t boa_map_insert(boa_map *map, const void *key, uint32_t hash, boa_cmp_fn cmp)
+boa_map_insert_result boa_map_insert(boa_map *map, const void *key, uint32_t hash, boa_cmp_fn cmp)
 {
 	return boa_map_insert_inline(map, key, hash, cmp);
 }
 
-uint32_t boa_map_find(boa_map *map, const void *key, uint32_t hash, boa_cmp_fn cmp)
+void *boa_map_find(boa_map *map, const void *key, uint32_t hash, boa_cmp_fn cmp)
 {
 	return boa_map_find_inline(map, key, hash, cmp);
 }
 
-uint32_t boa_map_erase(boa_map *map, uint32_t element)
+#define boa__map_element_from_kv(map, kv) (uint32_t)(((char*)(kv) - (char*)(map)->impl.data_blocks) / ((map)->impl.kv_size))
+
+boa_inline void *boa__map_block_end(boa_map *map, uint32_t block_ix)
 {
+	char *data = (char*)map->impl.data_blocks;
+	uint32_t count = map->impl.blocks[block_ix].count;
+	uint32_t element = boa__map_element_from_block(map, block_ix, count);
+	return boa__map_kv_from_element(map, element);
+}
+
+boa_map_iterator boa__map_find_block_start(boa_map *map, uint32_t block_ix)
+{
+	boa__map_block *block = &map->impl.blocks[block_ix];
+	uint32_t count = map->impl.num_used_blocks;
+	boa_map_iterator result;
+	result.value = NULL;
+
+	while (block_ix < count) {
+		uint32_t block_count = block->count;
+		if (block_count != 0) {
+			uint32_t element = boa__map_element_from_block(map, block_ix, 0);
+			result.value = boa__map_kv_from_element(map, element);
+			result.block_end = (char*)result.value + map->impl.kv_size * block_count;
+			break;
+		}
+		block_ix++;
+		block++;
+	}
+
+	return result;
+}
+
+void *boa__map_remove_non_iter(boa_map *map, void *value)
+{
+	uint32_t element = boa__map_element_from_kv(map, value);
 	uint32_t slot_ix = boa__hcs_current_slot(map->impl.hash_cur_slot[element]);
 	uint32_t block_ix = element >> map->impl.element_block_shift;
 	uint32_t element_ix = element & (map->impl.block_num_elements - 1);
@@ -506,7 +539,8 @@ uint32_t boa_map_erase(boa_map *map, uint32_t element)
 
 	map->count--;
 
-	uint32_t result = ~0u;
+	uint32_t res_block;
+	void *new_block_end;
 
 	// Swap the last element to the current element location
 	if (element_ix != count) {
@@ -517,22 +551,13 @@ uint32_t boa_map_erase(boa_map *map, uint32_t element)
 
 		uint32_t last_element = boa__map_element_from_block(map, block_ix, count);
 
-		void *dst = boa__map_kv_from_element(map, element);
 		void *src = boa__map_kv_from_element(map, last_element);
-		memcpy(dst, src, map->impl.kv_size);
+		memcpy(value, src, map->impl.kv_size);
 
-		result = element;
+		new_block_end = src;
+		res_block = block_ix;
 	} else {
-		boa__map_block *blocks = map->impl.blocks;
-		uint32_t next_block = block_ix;
-		next_block++;
-		while (next_block < map->impl.num_used_blocks) {
-			if (blocks[next_block].count != 0) {
-				result = next_block * map->impl.block_num_elements;
-				break;
-			}
-			next_block++;
-		}
+		new_block_end = NULL;
 	}
 
 	uint32_t slot_mask = map->impl.block_num_slots - 1;
@@ -545,7 +570,7 @@ uint32_t boa_map_erase(boa_map *map, uint32_t element)
 		uint32_t scan = boa__es_scan_distance(es, next_slot_ix, slot_mask);
 		if (es == 0 || scan == 0) {
 			element_slot[slot_ix] = 0;
-			return result;
+			break;
 		}
 
 		element_slot[slot_ix] = es;
@@ -558,38 +583,21 @@ uint32_t boa_map_erase(boa_map *map, uint32_t element)
 		slot_ix = next_slot_ix;
 	}
 
-	return result;
+	return new_block_end;
 }
 
-uint32_t boa_map_begin(boa_map *map)
+boa_map_iterator boa_map_iterate(boa_map *map, void *value)
 {
-	uint32_t block_ix = 0;
-	boa__map_block *block = &map->impl.blocks[block_ix];
-	uint32_t count = map->impl.num_used_blocks;
-	while (block_ix < count) {
-		if (block->count != 0) {
-			return block_ix * map->impl.block_num_elements;
-		}
-		block_ix++;
-		block++;
-	}
-	return ~0u;
+	uint32_t element = boa__map_element_from_kv(map, value);
+	uint32_t block_ix = element >> map->impl.element_block_shift;
+	return boa__map_find_block_start(map, block_ix);
 }
 
-uint32_t boa__map_find_next(boa_map *map, uint32_t block_ix)
+boa_map_iterator boa__map_find_next(boa_map *map, void *value)
 {
-	boa__map_block *block = &map->impl.blocks[block_ix];
-	uint32_t count = map->impl.num_used_blocks;
-	block_ix++;
-	block++;
-	while (block_ix < count) {
-		if (block->count != 0) {
-			return block_ix * map->impl.block_num_elements;
-		}
-		block_ix++;
-		block++;
-	}
-	return ~0u;
+	uint32_t element = boa__map_element_from_kv(map, value);
+	uint32_t block_ix = element >> map->impl.element_block_shift;
+	return boa__map_find_block_start(map, block_ix + 1);
 }
 
 void boa_map_reset(boa_map *map)

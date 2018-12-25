@@ -11,17 +11,18 @@ int int_cmp(const void *a, const void *b){ return *(int*)a == *(int*)b; }
 
 void insert_int(boa_map *map, int k, int v)
 {
-	uint32_t elem = boa_map_insert_inline(map, &k, int_hash(k), &int_cmp);
-	*boa_key(int, map, elem) = k;
-	*boa_val(int, map, elem) = v;
+	boa_map_insert_result ires = boa_map_insert_inline(map, &k, int_hash(k), &int_cmp);
+	boa_assert(ires.inserted);
+	boa_key(int, map, ires.value) = k;
+	boa_val(int, map, ires.value) = v;
 }
 
 int find_int(boa_map *map, int k)
 {
-	uint32_t elem = boa_map_find_inline(map, &k, int_hash(k), &int_cmp);
-	if (elem != ~0u) {
-		boa_assert(*boa_key(int, map, elem) == k);
-		return *boa_val(int, map, elem);
+	void *value = boa_map_find_inline(map, &k, int_hash(k), &int_cmp);
+	if (value != NULL) {
+		boa_assert(boa_key(int, map, value) == k);
+		return boa_val(int, map, value);
 	} else {
 		return -1;
 	}
@@ -29,10 +30,10 @@ int find_int(boa_map *map, int k)
 
 void erase_int(boa_map *map, int k)
 {
-	uint32_t elem = boa_map_find_inline(map, &k, int_hash(k), &int_cmp);
-	if (elem != ~0u) {
-		boa_assert(*boa_key(int, map, elem) == k);
-		boa_map_erase(map, elem);
+	void *value = boa_map_find_inline(map, &k, int_hash(k), &int_cmp);
+	if (value != NULL) {
+		boa_assert(boa_key(int, map, value) == k);
+		boa_map_remove(map, value);
 	}
 }
 
@@ -143,7 +144,29 @@ BOA_TEST(map_medium, "Insert a medium amount of keys")
 	boa_map_reset(map);
 }
 
-BOA_TEST(map_erase_simple, "Erase values from a hash map")
+BOA_TEST(map_medium_insert, "Insert over existing items")
+{
+	boa_map mapv = { 0 }, *map = &mapv;
+	uint32_t count = 1000;
+	init_square_map(map, count);
+
+	for (uint32_t i = 0; i < count; i++) {
+		boa_test_hint_u32(i);
+		int key = (int)i;
+		boa_map_insert_result ires = boa_map_insert(map, &key, int_hash(key), &int_cmp);
+		boa_assert(!ires.inserted);
+		boa_val(int, map, ires.value) = key * key * key;
+	}
+
+	for (uint32_t i = 0; i < count; i++) {
+		boa_test_hint_u32(i);
+		boa_assert(find_int(map, i) == i * i * i);
+	}
+
+	boa_map_reset(map);
+}
+
+BOA_TEST(map_remove_simple, "Remove values from a hash map")
 {
 	boa_map mapv = { 0 }, *map = &mapv;
 	map->key_size = sizeof(int);
@@ -169,12 +192,12 @@ BOA_TEST(map_erase_simple, "Erase values from a hash map")
 	boa_assert(find_int(map, 4) == -1);
 	boa_assert(find_int(map, 5) == -1);
 
-	uint32_t element = boa_map_begin(map);
-	boa_assert(element != ~0u);
-	element = boa_map_next(map, element);
-	boa_assert(element != ~0u);
-	element = boa_map_next(map, element);
-	boa_assert(element == ~0u);
+	boa_map_iterator it = boa_map_begin(map);
+	boa_assert(it.value);
+	boa_map_advance(map, &it);
+	boa_assert(it.value);
+	boa_map_advance(map, &it);
+	boa_assert(it.value == NULL);
 
 	boa_map_reset(map);
 }
@@ -195,11 +218,10 @@ BOA_TEST(map_iterate, "Iterating a small map")
 
 	int visited_value[6] = { 0 };
 
-	uint32_t element = boa_map_begin(map);
-	for (; element != ~0u; element = boa_map_next(map, element)) {
-		boa_test_hint_u32(element);
-		int key = *boa_key(int, map, element);
-		int val = *boa_val(int, map, element);
+	boa_map_iterator it = boa_map_begin(map);
+	for (; it.value; boa_map_advance(map, &it)) {
+		int key = boa_key(int, map, it.value);
+		int val = boa_val(int, map, it.value);
 		boa_assertf(key >= 0 && key < 6, "Key out of range: %d", key);
 		visited_value[key] = val;
 	}
@@ -223,10 +245,10 @@ BOA_TEST(map_iterate_medium, "Iterate a medium amount of keys")
 	int visited_value[1000] = { 0 };
 	uint32_t num_visited = 0;
 
-	uint32_t element = boa_map_begin(map);
-	for (; element != ~0u; element = boa_map_next(map, element)) {
-		int key = *boa_key(int, map, element);
-		int val = *boa_val(int, map, element);
+	boa_map_iterator it = boa_map_begin(map);
+	for (; it.value; boa_map_advance(map, &it)) {
+		int key = boa_key(int, map, it.value);
+		int val = boa_val(int, map, it.value);
 		visited_value[key] = val;
 		num_visited++;
 	}
@@ -241,7 +263,7 @@ BOA_TEST(map_iterate_medium, "Iterate a medium amount of keys")
 	boa_map_reset(map);
 }
 
-BOA_TEST(map_erase_medium_find, "Erase a medium amount of keys by find")
+BOA_TEST(map_remove_medium_find, "Remove a medium amount of keys by find")
 {
 	boa_map mapv = { 0 }, *map = &mapv;
 	uint32_t count = 1000;
@@ -251,29 +273,27 @@ BOA_TEST(map_erase_medium_find, "Erase a medium amount of keys by find")
 		boa_test_hint_u32(i);
 		int key = (int)i;
 		uint32_t hash = int_hash(key);
-		uint32_t element = boa_map_find(map, &key, hash, &int_cmp);
-		boa_assert(element != ~0u);
-		boa_map_erase(map, element);
+		void *value = boa_map_find(map, &key, hash, &int_cmp);
+		boa_assert(value != NULL);
+		boa_map_remove(map, value);
 		boa_assert(map->count == count - i - 1);
 	}
 
 	boa_map_reset(map);
 }
 
-BOA_TEST(map_erase_medium_iterate, "Erase a medium amount of keys by iteration")
+BOA_TEST(map_remove_medium_iterate, "Remove a medium amount of keys by iteration")
 {
 	boa_map mapv = { 0 }, *map = &mapv;
 	uint32_t count = 1000;
 	init_square_map(map, count);
 
-	uint32_t element = boa_map_begin(map);
+	boa_map_iterator it = boa_map_begin(map);
 	uint32_t iter = 0;
-	while (element != ~0u) {
+	while (it.value) {
 		iter++;
 		boa_test_hint_u32(iter);
-		boa_test_hint_u32(element);
-		boa_assert(element % map->impl.block_num_elements == 0);
-		element = boa_map_erase(map, element);
+		it = boa_map_remove_iter(map, it.value);
 		boa_assert(map->count == count - iter);
 	}
 
@@ -288,18 +308,17 @@ BOA_TEST(map_erase_erase_odd, "Erase odd keys from a map")
 	uint32_t count = 1000;
 	init_square_map(map, count);
 
-	uint32_t element = boa_map_begin(map);
+	boa_map_iterator it = boa_map_begin(map);
 	uint32_t iter = 0;
-	while (element != ~0u) {
+	while (it.value) {
 		iter++;
 		boa_test_hint_u32(iter);
-		boa_test_hint_u32(element);
 
-		int key = *boa_key(int, map, element);
+		int key = boa_key(int, map, it.value);
 		if (key % 2 == 1) {
-			element = boa_map_erase(map, element);
+			it = boa_map_remove_iter(map, it.value);
 		} else {
-			element = boa_map_next(map, element);
+			boa_map_advance(map, &it);
 		}
 	}
 
@@ -307,12 +326,11 @@ BOA_TEST(map_erase_erase_odd, "Erase odd keys from a map")
 	boa_assert(map->count == count / 2);
 
 	iter = 0;
-	element = boa_map_begin(map);
-	for (; element != ~0u; element = boa_map_next(map, element)) {
+	it = boa_map_begin(map);
+	for (; it.value; boa_map_advance(map, &it)) {
 		iter++;
 		boa_test_hint_u32(iter);
-		boa_test_hint_u32(element);
-		int key = *boa_key(int, map, element);
+		int key = boa_key(int, map, it.value);
 		boa_assert(key % 2 == 0);
 	}
 
@@ -354,9 +372,10 @@ BOA_TEST(map_erase_insert_loop, "Insert + erase loop should not reallocate")
 	for (uint32_t i = 0; i < 10000; i++) {
 		int key = (int)i;
 		uint32_t hash = int_hash(key);
-		uint32_t element = boa_map_insert(map, &key, hash, &int_cmp);
-		boa_assert(element != ~0u);
-		boa_map_erase(map, element);
+		boa_map_insert_result ires = boa_map_insert(map, &key, hash, &int_cmp);
+		boa_assert(ires.value);
+		boa_assert(ires.inserted);
+		boa_map_remove(map, ires.value);
 	}
 
 	boa_assert(capacity == map->capacity);
@@ -382,13 +401,14 @@ BOA_TEST(map_insert_alloc_fail, "Insert should fail gracefully")
 		int had_space = (map->count < map->capacity) ? 1 : 0;
 		int key = (int)i;
 		uint32_t hash = int_hash(key);
-		uint32_t element = boa_map_insert(map, &key, hash, &int_cmp);
+		boa_map_insert_result ires = boa_map_insert(map, &key, hash, &int_cmp);
 		if (had_space) {
-			*boa_key(int, map, element) = i;
-			*boa_val(int, map, element) = i * i;
-			boa_assert(element != ~0u);
+			boa_assert(ires.inserted);
+			boa_assert(ires.value != NULL);
+			boa_key(int, map, ires.value) = i;
+			boa_val(int, map, ires.value) = i * i;
 		} else {
-			boa_assert(element == ~0u);
+			boa_assert(ires.value == NULL);
 			inserted_until = i;
 			break;
 		}
@@ -438,10 +458,11 @@ BOA_TEST(map_insert_alloc_fail_fallback, "Insert should fail gracefully on aux b
 	for (uint32_t i = 0; i < 1024; i++) {
 		boa_assert(map->count < map->capacity);
 		int key = (int)i;
-		uint32_t element = boa_map_insert(map, &key, 0, &int_cmp);
-		if (element != ~0u) {
-			*boa_key(int, map, element) = i;
-			*boa_val(int, map, element) = i * i;
+		boa_map_insert_result ires = boa_map_insert(map, &key, 0, &int_cmp);
+		if (ires.value) {
+			boa_assert(ires.inserted);
+			boa_key(int, map, ires.value) = i;
+			boa_val(int, map, ires.value) = i * i;
 		} else {
 			inserted_until = i;
 			break;
@@ -453,9 +474,9 @@ BOA_TEST(map_insert_alloc_fail_fallback, "Insert should fail gracefully on aux b
 
 	for (uint32_t i = 0; i < inserted_until; i++) {
 		int key = (int)i;
-		uint32_t elem = boa_map_find_inline(map, &key, 0, &int_cmp);
-		boa_assert(*boa_key(int, map, elem) == i);
-		boa_assert(*boa_val(int, map, elem) == i * i);
+		void *value = boa_map_find(map, &key, 0, &int_cmp);
+		boa_assert(boa_key(int, map, value) == i);
+		boa_assert(boa_val(int, map, value) == i * i);
 	}
 
 	boa_map_reset(map);
