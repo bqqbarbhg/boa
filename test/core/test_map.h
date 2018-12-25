@@ -5,6 +5,7 @@
 #if BOA_TEST_IMPL
 uint32_t g_hash_factor;
 int g_do_reserve;
+int g_insert_reversed;
 
 uint32_t int_hash(int i){ return i % 10000 * g_hash_factor; }
 int int_cmp(const void *a, const void *b){ return *(int*)a == *(int*)b; }
@@ -47,8 +48,13 @@ void init_square_map(boa_map *map, uint32_t count)
 		boa_assert(map->capacity >= count);
 	}
 
-	for (uint32_t i = 0; i < count; i++)
-		insert_int(map, i, i * i);
+	if (g_insert_reversed) {
+		for (uint32_t i = 0; i < count; i++)
+			insert_int(map, i, i * i);
+	} else {
+		for (int i = count - 1; i >= 0; i--)
+			insert_int(map, i, i * i);
+	}
 
 	boa_assert(map->count == count);
 }
@@ -57,6 +63,7 @@ void init_square_map(boa_map *map, uint32_t count)
 
 extern uint32_t g_hash_factor;
 extern int g_do_reserve;
+extern int g_insert_reversed;
 
 static uint32_t hash_factors[] = {
 	1051, // < Provides reasonable hashing
@@ -73,6 +80,10 @@ static uint32_t hash_factors_no_zero[] = {
 
 static int reserve_values[] = {
 	1, 0,
+};
+
+static int insert_reversed_values[] = {
+	0, 1,
 };
 
 #endif
@@ -129,6 +140,8 @@ BOA_TEST(map_simple_collision, "Simple manual hash collision test")
 
 	boa_map_reset(map);
 }
+
+BOA_TEST_BEGIN_PERMUTATION_U32(g_insert_reversed, insert_reversed_values)
 
 BOA_TEST(map_medium, "Insert a medium amount of keys")
 {
