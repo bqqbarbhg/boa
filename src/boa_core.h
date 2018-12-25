@@ -36,7 +36,15 @@
 #if defined(__cplusplus)
 	#define boa_inline inline
 #else
-	#define boa_inline
+	#define boa_inline static
+#endif
+
+#if BOA_MSVC
+	#define boa_forceinline __forceinline
+#elif BOA_GNUC
+	#define boa_forceinline __attribute__((always_inline))
+#else
+	#define boa_forceinline boa_inline
 #endif
 
 #if BOA_SINGLETHREADED
@@ -125,19 +133,22 @@ typedef struct boa_buf {
 } boa_buf;
 
 
-boa_inline boa_buf boa_buf_make(void *data, uint32_t cap, boa_allocator *ator)
+boa_inline boa_forceinline boa_buf
+boa_buf_make(void *data, uint32_t cap, boa_allocator *ator)
 {
 	boa_buf b = { (uintptr_t)ator, data, 0, cap };
 	return b;
 }
 
-boa_inline boa_buf *boa_clear(boa_buf *buf)
+boa_inline boa_forceinline boa_buf *
+boa_clear(boa_buf *buf)
 {
 	buf->end_pos = 0;
 	return buf;
 }
 
-boa_inline boa_buf *boa_reset(boa_buf *buf)
+boa_inline boa_forceinline boa_buf *
+boa_reset(boa_buf *buf)
 {
 	extern void boa__buf_reset_heap(boa_buf *buf);
 	buf->end_pos = 0;
@@ -146,7 +157,8 @@ boa_inline boa_buf *boa_reset(boa_buf *buf)
 	return buf;
 }
 
-boa_inline void *boa_buf_reserve(boa_buf *buf, uint32_t size)
+boa_inline boa_forceinline void *
+boa_buf_reserve(boa_buf *buf, uint32_t size)
 {
 	extern void *boa__buf_grow(boa_buf *buf, uint32_t req_cap);
 	uint32_t end = buf->end_pos, cap = buf->cap_pos;
@@ -155,20 +167,23 @@ boa_inline void *boa_buf_reserve(boa_buf *buf, uint32_t size)
 	return boa__buf_grow(buf, req_cap);
 }
 
-boa_inline void boa_buf_bump(boa_buf *buf, uint32_t size)
+boa_inline boa_forceinline void
+boa_buf_bump(boa_buf *buf, uint32_t size)
 {
 	boa_assert(buf->end_pos + size <= buf->cap_pos);
 	buf->end_pos += size;
 }
 
-boa_inline void *boa_buf_push(boa_buf *buf, uint32_t size)
+boa_inline boa_forceinline void *
+boa_buf_push(boa_buf *buf, uint32_t size)
 {
 	void *ptr = boa_buf_reserve(buf, size);
 	if (ptr) boa_buf_bump(buf, size);
 	return ptr;
 }
 
-boa_inline int boa_buf_push_data(boa_buf *buf, const void *data, uint32_t size)
+boa_inline boa_forceinline int
+boa_buf_push_data(boa_buf *buf, const void *data, uint32_t size)
 {
 	void *ptr = boa_buf_push(buf, size);
 	if (ptr) {
@@ -179,23 +194,27 @@ boa_inline int boa_buf_push_data(boa_buf *buf, const void *data, uint32_t size)
 	}
 }
 
-boa_inline int boa_buf_push_buf(boa_buf *dst, const boa_buf *src)
+boa_inline boa_forceinline int
+boa_buf_push_buf(boa_buf *dst, const boa_buf *src)
 {
 	return boa_buf_push_data(dst, src->data, src->end_pos);
 }
 
-boa_inline boa_allocator *boa_buf_ator(boa_buf *buf)
+boa_inline boa_forceinline boa_allocator *
+boa_buf_ator(boa_buf *buf)
 {
 	return (boa_allocator*)(buf->ator_flags & ~(uintptr_t)BOA_BUF_FLAG_MASK);
 }
 
-boa_inline void *boa_buf_get(boa_buf *buf, uint32_t offset, uint32_t size)
+boa_inline boa_forceinline void *
+boa_buf_get(boa_buf *buf, uint32_t offset, uint32_t size)
 {
 	boa_assert(offset + size <= buf->end_pos);
 	return (char*)buf->data + offset;
 }
 
-boa_inline void boa_buf_remove(boa_buf *buf, uint32_t offset, uint32_t size)
+boa_inline boa_forceinline void
+boa_buf_remove(boa_buf *buf, uint32_t offset, uint32_t size)
 {
 	char *data = (char*)buf->data;
 	uint32_t end_pos = buf->end_pos;
@@ -207,7 +226,8 @@ boa_inline void boa_buf_remove(boa_buf *buf, uint32_t offset, uint32_t size)
 	buf->end_pos = end_pos - size;
 }
 
-boa_inline void boa_buf_erase(boa_buf *buf, uint32_t offset, uint32_t size)
+boa_inline boa_forceinline void
+boa_buf_erase(boa_buf *buf, uint32_t offset, uint32_t size)
 {
 	char *data = (char*)buf->data;
 	uint32_t end_pos = buf->end_pos;
@@ -220,7 +240,8 @@ boa_inline void boa_buf_erase(boa_buf *buf, uint32_t offset, uint32_t size)
 	buf->end_pos = end_pos - size;
 }
 
-boa_inline void *boa_buf_pop(boa_buf *buf, uint32_t size)
+boa_inline boa_forceinline void *
+boa_buf_pop(boa_buf *buf, uint32_t size)
 {
 	char *data = (char*)buf->data;
 	boa_assert(size <= buf->end_pos);
@@ -385,7 +406,8 @@ boa_map_iterator boa__map_find_next(boa_map *map, void *value);
 
 int boa_map_reserve(boa_map *map, uint32_t capacity);
 
-boa_inline boa_map_insert_result boa_map_insert_inline(boa_map *map, const void *key, uint32_t hash, boa_cmp_fn cmp)
+boa_inline boa_forceinline boa_map_insert_result
+boa_map_insert_inline(boa_map *map, const void *key, uint32_t hash, boa_cmp_fn cmp)
 {
 	boa_map_insert_result result;
 	result.value = NULL;
@@ -484,7 +506,8 @@ boa_inline boa_map_insert_result boa_map_insert_inline(boa_map *map, const void 
 	return result;
 }
 
-boa_inline void *boa_map_find_inline(boa_map *map, const void *key, uint32_t hash, boa_cmp_fn cmp)
+boa_inline boa_forceinline void *
+boa_map_find_inline(boa_map *map, const void *key, uint32_t hash, boa_cmp_fn cmp)
 {
 	// Edge case: Other values may not be valid when empty!
 	if (map->count == 0) return NULL;
@@ -533,12 +556,14 @@ boa_inline void *boa_map_find_inline(boa_map *map, const void *key, uint32_t has
 boa_map_insert_result boa_map_insert(boa_map *map, const void *key, uint32_t hash, boa_cmp_fn cmp);
 void *boa_map_find(boa_map *map, const void *key, uint32_t hash, boa_cmp_fn cmp);
 
-boa_inline void boa_map_remove(boa_map *map, void *value)
+boa_inline boa_forceinline
+void boa_map_remove(boa_map *map, void *value)
 {
 	boa__map_remove_non_iter(map, value);
 }
 
-boa_inline boa_map_iterator boa_map_remove_iter(boa_map *map, void *value)
+boa_inline boa_forceinline boa_map_iterator
+boa_map_remove_iter(boa_map *map, void *value)
 {
 	boa_map_iterator result;
 	result.value = value;
@@ -551,12 +576,14 @@ boa_inline boa_map_iterator boa_map_remove_iter(boa_map *map, void *value)
 
 boa_map_iterator boa_map_iterate(boa_map *map, void *value);
 
-boa_inline boa_map_iterator boa_map_begin(boa_map *map)
+boa_inline boa_forceinline boa_map_iterator
+boa_map_begin(boa_map *map)
 {
 	return boa__map_find_block_start(map, 0);
 }
 
-boa_inline void boa_map_advance(boa_map *map, boa_map_iterator *it)
+boa_inline boa_forceinline void
+boa_map_advance(boa_map *map, boa_map_iterator *it)
 {
 	boa_assert(it->value != NULL);
 	void *next = (char*)it->value + map->impl.kv_size;
