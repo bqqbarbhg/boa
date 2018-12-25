@@ -41,7 +41,7 @@
 
 #if BOA_SINGLETHREADED
 	#define boa_threadlocal
-#elif __cplusplus  >= 201103L
+#elif __cplusplus >= 201103L
 	#define boa_threadlocal thread_local
 #elif __STDC_VERSION__ >= 201112L
 	#define boa_threadlocal _Thread_local
