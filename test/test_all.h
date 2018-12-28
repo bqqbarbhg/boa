@@ -13,3 +13,5 @@
 #include "core/test_core_cpp.h"
 #endif
 
+#include "os/test_os.h"
+

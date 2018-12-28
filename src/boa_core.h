@@ -7,31 +7,77 @@
 
 // -- Platform
 
-#if !defined(BOA_GENERIC)
+// Compiler
+#define BOA_MSVC 0  // < Miscosoft Visual C++
+#define BOA_GNUC 0  // GCC or Clang
+#define BOA_CLANG 0 // Clang only
+
+// Architecture
+#define BOA_64BIT 0 // < 64-bit arch
+#define BOA_X86 0   // < x86 or x64 depending on BOA_64BIT
+
+// Operating system
+#define BOA_WINDOWS 0 // < Windows
+#define BOA_LINUX 0   // < Linux (or Linux like)
+
+#if !defined(BOA_SINGLETHREADED)
+	#define BOA_SINGLETHREADED 0
+#else
+	#undef BOA_SINGLETHREADED
+	#define BOA_SINGLETHREADED 1
+#endif
+
+#if !defined(BOA_RELEASE)
+	#define BOA_RELEASE 0
+#else
+	#undef BOA_RELEASE
+	#define BOA_RELEASE 1
+#endif
 
 #if defined(_MSC_VER)
+	#undef BOA_MSVC
 	#define BOA_MSVC 1
 #elif defined(__GNUC__) || defined(__clang__)
+	#undef BOA_GNUC
 	#define BOA_GNUC 1
+#else
+	#error "Unsupported compiler"
+#endif
+
+#if defined(__clang__)
+	#undef BOA_CLANG
+	#define BOA_CLANG 1
 #endif
 
 #if UINTPTR_MAX == UINT64_MAX
-	#define BOA_64BIT
-#elif UINTPTR_MAX == UINT32_MAX
-	#define BOA_32BIT
+	#undef BOA_64BIT
+	#define BOA_64BIT 1
 #endif
 
-#endif // !defined(BOA_GENERIC)
+#if defined(__i386__) || defined(__x86_64__) || defined(_M_AMD64) || defined(_M_IX86)
+	#undef BOA_X86
+	#define BOA_X86 1
+#else
+	#error "Unsupported architecture"
+#endif
 
-// -- General helpers
+#if defined(_WIN32)
+	#undef BOA_WINDOWS
+	#define BOA_WINDOWS 1
+#elif defined(__linux__)
+	#undef BOA_LINUX
+	#define BOA_LINUX 1
+#else
+	#error "Unsupported OS"
+#endif
+
+// -- Language
 
 #include <stddef.h>
 #include <string.h>
 
 #define boa_arraycount(arr) (sizeof(arr) / sizeof(*(arr)))
 #define boa_arrayend(arr) (arr + (sizeof(arr) / sizeof(*(arr))))
-
-// -- Platform
 
 #if defined(__cplusplus)
 	#define boa_inline inline
@@ -40,11 +86,19 @@
 #endif
 
 #if BOA_MSVC
-	#define boa_forceinline __forceinline
+	#define boa_forceinline static __forceinline
 #elif BOA_GNUC
-	#define boa_forceinline __attribute__((always_inline))
+	#define boa_forceinline static __attribute__((always_inline))
 #else
-	#define boa_forceinline boa_inline
+	#define boa_forceinline static boa_inline
+#endif
+
+#if BOA_MSVC
+	#define boa_noinline __declspec(noinline)
+#elif BOA_GNUC
+	#define boa_noinline __attribute__((noinline))
+#else
+	#define boa_noinline
 #endif
 
 #if BOA_SINGLETHREADED
@@ -61,12 +115,30 @@
 	#error "Unsupported platform"
 #endif
 
+#define BOA__CONCAT_STEP(x, y) x ## y
+#define BOA_CONCAT(x, y) BOA__CONCAT_STEP(x, y)
+
 // -- boa_assert
 
 #if !defined(boa_assert) && !defined(boa_assertf)
 
+#if BOA_RELEASE && BOA_CLANG
+	#define boa_assert(cond) __builtin_assume(cond)
+	#define boa_assertf(cond, ...) __builtin_assume(cond)
+#elif BOA_RELEASE
+	#define boa_assert(cond) (void)0
+	#define boa_assertf(cond, ...) (void)0
+#elif BOA_MSVC
 	#define boa_assert(cond) if (!(cond)) __debugbreak()
 	#define boa_assertf(cond, ...) if (!(cond)) __debugbreak()
+#elif BOA_GNUC
+	#define boa_assert(cond) if (!(cond)) __builtin_trap()
+	#define boa_assertf(cond, ...) if (!(cond)) __builtin_trap()
+#else
+	#include <assert.h>
+	#define boa_assert(cond) assert((cond))
+	#define boa_assertf(cond, ...) assert((cond))
+#endif
 
 #elif !defined(boa_assert)
 	#error "Custom assert defined without boa_assert()"
@@ -133,21 +205,21 @@ typedef struct boa_buf {
 } boa_buf;
 
 
-boa_inline boa_forceinline boa_buf
+boa_forceinline boa_buf
 boa_buf_make(void *data, uint32_t cap, boa_allocator *ator)
 {
 	boa_buf b = { (uintptr_t)ator, data, 0, cap };
 	return b;
 }
 
-boa_inline boa_forceinline boa_buf *
+boa_forceinline boa_buf *
 boa_clear(boa_buf *buf)
 {
 	buf->end_pos = 0;
 	return buf;
 }
 
-boa_inline boa_forceinline boa_buf *
+boa_forceinline boa_buf *
 boa_reset(boa_buf *buf)
 {
 	extern void boa__buf_reset_heap(boa_buf *buf);
@@ -157,7 +229,7 @@ boa_reset(boa_buf *buf)
 	return buf;
 }
 
-boa_inline boa_forceinline void *
+boa_forceinline void *
 boa_buf_reserve(boa_buf *buf, uint32_t size)
 {
 	extern void *boa__buf_grow(boa_buf *buf, uint32_t req_cap);
@@ -167,14 +239,14 @@ boa_buf_reserve(boa_buf *buf, uint32_t size)
 	return boa__buf_grow(buf, req_cap);
 }
 
-boa_inline boa_forceinline void
+boa_forceinline void
 boa_buf_bump(boa_buf *buf, uint32_t size)
 {
 	boa_assert(buf->end_pos + size <= buf->cap_pos);
 	buf->end_pos += size;
 }
 
-boa_inline boa_forceinline void *
+boa_forceinline void *
 boa_buf_push(boa_buf *buf, uint32_t size)
 {
 	void *ptr = boa_buf_reserve(buf, size);
@@ -182,7 +254,7 @@ boa_buf_push(boa_buf *buf, uint32_t size)
 	return ptr;
 }
 
-boa_inline boa_forceinline int
+boa_forceinline int
 boa_buf_push_data(boa_buf *buf, const void *data, uint32_t size)
 {
 	void *ptr = boa_buf_push(buf, size);
@@ -194,26 +266,26 @@ boa_buf_push_data(boa_buf *buf, const void *data, uint32_t size)
 	}
 }
 
-boa_inline boa_forceinline int
+boa_forceinline int
 boa_buf_push_buf(boa_buf *dst, const boa_buf *src)
 {
 	return boa_buf_push_data(dst, src->data, src->end_pos);
 }
 
-boa_inline boa_forceinline boa_allocator *
+boa_forceinline boa_allocator *
 boa_buf_ator(boa_buf *buf)
 {
 	return (boa_allocator*)(buf->ator_flags & ~(uintptr_t)BOA_BUF_FLAG_MASK);
 }
 
-boa_inline boa_forceinline void *
+boa_forceinline void *
 boa_buf_get(boa_buf *buf, uint32_t offset, uint32_t size)
 {
 	boa_assert(offset + size <= buf->end_pos);
 	return (char*)buf->data + offset;
 }
 
-boa_inline boa_forceinline void
+boa_forceinline void
 boa_buf_remove(boa_buf *buf, uint32_t offset, uint32_t size)
 {
 	char *data = (char*)buf->data;
@@ -226,7 +298,7 @@ boa_buf_remove(boa_buf *buf, uint32_t offset, uint32_t size)
 	buf->end_pos = end_pos - size;
 }
 
-boa_inline boa_forceinline void
+boa_forceinline void
 boa_buf_erase(boa_buf *buf, uint32_t offset, uint32_t size)
 {
 	char *data = (char*)buf->data;
@@ -240,7 +312,7 @@ boa_buf_erase(boa_buf *buf, uint32_t offset, uint32_t size)
 	buf->end_pos = end_pos - size;
 }
 
-boa_inline boa_forceinline void *
+boa_forceinline void *
 boa_buf_pop(boa_buf *buf, uint32_t size)
 {
 	char *data = (char*)buf->data;
@@ -406,7 +478,7 @@ boa_map_iterator boa__map_find_next(boa_map *map, void *value);
 
 int boa_map_reserve(boa_map *map, uint32_t capacity);
 
-boa_inline boa_forceinline boa_map_insert_result
+boa_forceinline boa_map_insert_result
 boa_map_insert_inline(boa_map *map, const void *key, uint32_t hash, boa_cmp_fn cmp)
 {
 	boa_map_insert_result result;
@@ -506,7 +578,7 @@ boa_map_insert_inline(boa_map *map, const void *key, uint32_t hash, boa_cmp_fn c
 	return result;
 }
 
-boa_inline boa_forceinline void *
+boa_forceinline void *
 boa_map_find_inline(boa_map *map, const void *key, uint32_t hash, boa_cmp_fn cmp)
 {
 	// Edge case: Other values may not be valid when empty!
@@ -553,16 +625,16 @@ boa_map_find_inline(boa_map *map, const void *key, uint32_t hash, boa_cmp_fn cmp
 	return NULL;
 }
 
-boa_map_insert_result boa_map_insert(boa_map *map, const void *key, uint32_t hash, boa_cmp_fn cmp);
-void *boa_map_find(boa_map *map, const void *key, uint32_t hash, boa_cmp_fn cmp);
+boa_noinline boa_map_insert_result boa_map_insert(boa_map *map, const void *key, uint32_t hash, boa_cmp_fn cmp);
+boa_noinline void *boa_map_find(boa_map *map, const void *key, uint32_t hash, boa_cmp_fn cmp);
 
-boa_inline boa_forceinline
+boa_forceinline
 void boa_map_remove(boa_map *map, void *value)
 {
 	boa__map_remove_non_iter(map, value);
 }
 
-boa_inline boa_forceinline boa_map_iterator
+boa_forceinline boa_map_iterator
 boa_map_remove_iter(boa_map *map, void *value)
 {
 	boa_map_iterator result;
@@ -576,13 +648,13 @@ boa_map_remove_iter(boa_map *map, void *value)
 
 boa_map_iterator boa_map_iterate(boa_map *map, void *value);
 
-boa_inline boa_forceinline boa_map_iterator
+boa_forceinline boa_map_iterator
 boa_map_begin(boa_map *map)
 {
 	return boa__map_find_block_start(map, 0);
 }
 
-boa_inline boa_forceinline void
+boa_forceinline void
 boa_map_advance(boa_map *map, boa_map_iterator *it)
 {
 	boa_assert(it->value != NULL);
@@ -594,7 +666,14 @@ boa_map_advance(boa_map *map, boa_map_iterator *it)
 	}
 }
 
+void boa_map_clear(boa_map *map);
+
 void boa_map_reset(boa_map *map);
+
+boa_forceinline uint32_t boa_hash_combine(uint32_t hash, uint32_t value)
+{
+	return hash ^ (value + 0x9e3779b9 + (hash << 6) + (hash >> 2));
+}
 
 #define boa_key(type, map, elem) (*(type*)boa_check_ptr(elem))
 #define boa_val(type, map, elem) (*(type*)((char*)boa_check_ptr(elem) + (map)->impl.val_offset))

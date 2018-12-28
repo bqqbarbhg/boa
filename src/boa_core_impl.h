@@ -1,14 +1,14 @@
 #pragma once
 
+#ifndef BOA__CORE_IMPLEMENTED
+#define BOA__CORE_IMPLEMENTED
+
 #include "boa_core.h"
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdarg.h>
 #include <stdio.h>
-
-#ifndef BOA__CORE_IMPLEMENTED
-#define BOA__CORE_IMPLEMENTED
 
 #if BOA_MSVC
 	#include <intrin.h>
@@ -38,22 +38,7 @@ uint32_t boa_highest_bit(uint32_t value)
 #elif BOA_GNUC
 	return 31 - __builtin_clz(value);
 #else
-	// https://graphics.stanford.edu/~seander/bithacks.html#IntegerLogDeBruijn
-	uint32_t v = value;
-
-	static const uint32_t MultiplyDeBruijnBitPosition[32] = 
-	{
-	  0, 9, 1, 10, 13, 21, 2, 29, 11, 14, 16, 18, 22, 25, 3, 30,
-	  8, 12, 20, 28, 15, 17, 24, 7, 19, 27, 23, 6, 26, 5, 4, 31
-	};
-
-	v |= v >> 1;
-	v |= v >> 2;
-	v |= v >> 4;
-	v |= v >> 8;
-	v |= v >> 16;
-
-	return MultiplyDeBruijnBitPosition[(uint32_t)(v * 0x07C4ACDDU) >> 27];
+	#error "Unimplemented"
 #endif
 }
 
@@ -478,25 +463,17 @@ uint32_t boa__map_find_fallback(boa_map *map, uint32_t block_ix)
 	return block_ix;
 }
 
-boa_map_insert_result boa_map_insert(boa_map *map, const void *key, uint32_t hash, boa_cmp_fn cmp)
+boa_noinline boa_map_insert_result boa_map_insert(boa_map *map, const void *key, uint32_t hash, boa_cmp_fn cmp)
 {
 	return boa_map_insert_inline(map, key, hash, cmp);
 }
 
-void *boa_map_find(boa_map *map, const void *key, uint32_t hash, boa_cmp_fn cmp)
+boa_noinline void *boa_map_find(boa_map *map, const void *key, uint32_t hash, boa_cmp_fn cmp)
 {
 	return boa_map_find_inline(map, key, hash, cmp);
 }
 
 #define boa__map_element_from_kv(map, kv) (uint32_t)(((char*)(kv) - (char*)(map)->impl.data_blocks) / ((map)->impl.kv_size))
-
-boa_inline void *boa__map_block_end(boa_map *map, uint32_t block_ix)
-{
-	char *data = (char*)map->impl.data_blocks;
-	uint32_t count = map->impl.blocks[block_ix].count;
-	uint32_t element = boa__map_element_from_block(map, block_ix, count);
-	return boa__map_kv_from_element(map, element);
-}
 
 boa_map_iterator boa__map_find_block_start(boa_map *map, uint32_t block_ix)
 {
@@ -600,12 +577,20 @@ boa_map_iterator boa__map_find_next(boa_map *map, void *value)
 	return boa__map_find_block_start(map, block_ix + 1);
 }
 
+void boa_map_clear(boa_map *map)
+{
+	map->count = 0;
+	memset(map->impl.element_slot, 0, sizeof(uint16_t) * map->impl.block_num_slots * map->impl.num_hash_blocks);
+	memset(map->impl.blocks, 0, sizeof(boa__map_block) * map->impl.num_hash_blocks);
+}
+
 void boa_map_reset(boa_map *map)
 {
 	map->count = 0;
 	map->capacity = 0;
 	if (map->impl.allocation) {
 		boa_free_ator(map->ator, map->impl.allocation);
+		map->impl.allocation = NULL;
 	}
 }
 

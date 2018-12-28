@@ -455,6 +455,7 @@ BOA_TEST(map_large, "Insert a large amount of keys")
 
 BOA_TEST_END_PERMUTATION(g_hash_factor)
 BOA_TEST_END_PERMUTATION(g_do_reserve)
+BOA_TEST_END_PERMUTATION(g_insert_reversed)
 
 BOA_TEST(map_insert_alloc_fail_fallback, "Insert should fail gracefully on aux block allocation")
 {
