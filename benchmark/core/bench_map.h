@@ -23,16 +23,12 @@ uint32_t g_do_reserve;
 boa_inline uint32_t int_hash(int i)
 {
 	uint32_t x = (uint32_t)i;
-#if 0
 	x = ((x >> 16) ^ x) * 0x45d9f3b;
 	x = ((x >> 16) ^ x) * 0x45d9f3b;
 	x = (x >> 16) ^ x;
-#else
-	x *= 2654435761u;
-#endif
 	return x;
 }
-boa_inline int int_cmp(const void *a, const void *b) { return *(int*)a == *(int*)b; }
+boa_inline int int_cmp(const void *a, const void *b, boa_map *m) { return *(int*)a == *(int*)b; }
 
 typedef struct int_pair { int x, y; } int_pair;
 
@@ -42,7 +38,7 @@ boa_inline uint32_t pair_hash(int_pair pair)
 	uint32_t y = int_hash(pair.y);
 	return boa_hash_combine(x, y);
 }
-boa_inline int pair_cmp(const void *a, const void *b) {
+boa_inline int pair_cmp(const void *a, const void *b, boa_map *m) {
 	const int_pair *pa = (const int_pair*)a, *pb = (const int_pair*)b;
 	if (pa->x != pb->x) return 0;
 	if (pa->y != pb->y) return 0;
@@ -138,6 +134,30 @@ BOA_BENCHMARK_P(int_map_insert_consecutive, "Insert consecutive integers into a 
 	}
 }
 
+BOA_BENCHMARK_P(int_bmap_insert_consecutive, "Insert consecutive integers into a bmap")
+{
+	boa_map mapv = { 0 }, *map = &mapv;
+	map->key_size = sizeof(int);
+	map->val_size = sizeof(int);
+
+	if (g_do_reserve)
+		boa_map_reserve(map, g_map_size);
+
+	boa_benchmark_for() {
+		if (g_do_reserve) {
+			boa_map_clear(map);
+		} else {
+			boa_map_reset(map);
+		}
+
+		uint32_t size = boa_benchmark_count();
+		for (uint32_t i = 0; i < size; i++) {
+			uint32_t key = i;
+			boa_bmap_insert(map, &key);
+		}
+	}
+}
+
 BOA_BENCHMARK_P(pair_map_insert_consecutive, "Insert consecutive pairs into a map")
 {
 	boa_map mapv = { 0 }, *map = &mapv;
@@ -160,6 +180,32 @@ BOA_BENCHMARK_P(pair_map_insert_consecutive, "Insert consecutive pairs into a ma
 			pair.x = i;
 			pair.y = i;
 			insert_pair(map, pair, i);
+		}
+	}
+}
+
+BOA_BENCHMARK_P(pair_bmap_insert_consecutive, "Insert consecutive pairs into a bmap")
+{
+	boa_map mapv = { 0 }, *map = &mapv;
+	map->key_size = sizeof(int_pair);
+	map->val_size = sizeof(int);
+
+	if (g_do_reserve)
+		boa_map_reserve(map, g_map_size);
+
+	boa_benchmark_for() {
+		if (g_do_reserve) {
+			boa_map_clear(map);
+		} else {
+			boa_map_reset(map);
+		}
+
+		uint32_t size = boa_benchmark_count();
+		for (uint32_t i = 0; i < size; i++) {
+			int_pair pair;
+			pair.x = i;
+			pair.y = i;
+			boa_bmap_insert(map, &pair);
 		}
 	}
 }

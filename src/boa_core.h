@@ -444,7 +444,7 @@ typedef struct boa__map_block {
 } boa__map_block;
 
 // Return non-zero if `a` is equal to `b`
-typedef int (*boa_cmp_fn)(const void *a, const void *b);
+typedef int (*boa_map_cmp_fn)(const void *a, const void *b, boa_map *map);
 
 typedef struct boa_map_insert_result {
 	void *value;
@@ -479,7 +479,7 @@ boa_map_iterator boa__map_find_next(boa_map *map, void *value);
 int boa_map_reserve(boa_map *map, uint32_t capacity);
 
 boa_forceinline boa_map_insert_result
-boa_map_insert_inline(boa_map *map, const void *key, uint32_t hash, boa_cmp_fn cmp)
+boa_map_insert_inline(boa_map *map, const void *key, uint32_t hash, boa_map_cmp_fn cmp)
 {
 	boa_map_insert_result result;
 	result.value = NULL;
@@ -514,7 +514,7 @@ boa_map_insert_inline(boa_map *map, const void *key, uint32_t hash, boa_cmp_fn c
 				uint32_t element_offset = boa__es_element_offset(es);
 				uint32_t element = boa__map_element_from_block(map, block_ix, element_offset);
 				void *kv = boa__map_kv_from_element(map, element);
-				if (cmp(key, kv)) {
+				if (cmp(key, kv, map)) {
 					result.value = kv;
 					return result;
 				}
@@ -579,7 +579,7 @@ boa_map_insert_inline(boa_map *map, const void *key, uint32_t hash, boa_cmp_fn c
 }
 
 boa_forceinline void *
-boa_map_find_inline(boa_map *map, const void *key, uint32_t hash, boa_cmp_fn cmp)
+boa_map_find_inline(boa_map *map, const void *key, uint32_t hash, boa_map_cmp_fn cmp)
 {
 	// Edge case: Other values may not be valid when empty!
 	if (map->count == 0) return NULL;
@@ -604,7 +604,7 @@ boa_map_find_inline(boa_map *map, const void *key, uint32_t hash, boa_cmp_fn cmp
 				uint32_t element_offset = boa__es_element_offset(es);
 				uint32_t element = boa__map_element_from_block(map, block_ix, element_offset);
 				void *kv = boa__map_kv_from_element(map, element);
-				if (cmp(key, kv)) {
+				if (cmp(key, kv, map)) {
 					return kv;
 				}
 			}
@@ -625,8 +625,8 @@ boa_map_find_inline(boa_map *map, const void *key, uint32_t hash, boa_cmp_fn cmp
 	return NULL;
 }
 
-boa_noinline boa_map_insert_result boa_map_insert(boa_map *map, const void *key, uint32_t hash, boa_cmp_fn cmp);
-boa_noinline void *boa_map_find(boa_map *map, const void *key, uint32_t hash, boa_cmp_fn cmp);
+boa_noinline boa_map_insert_result boa_map_insert(boa_map *map, const void *key, uint32_t hash, boa_map_cmp_fn cmp);
+boa_noinline void *boa_map_find(boa_map *map, const void *key, uint32_t hash, boa_map_cmp_fn cmp);
 
 boa_forceinline
 void boa_map_remove(boa_map *map, void *value)
@@ -677,5 +677,10 @@ boa_forceinline uint32_t boa_hash_combine(uint32_t hash, uint32_t value)
 
 #define boa_key(type, map, elem) (*(type*)boa_check_ptr(elem))
 #define boa_val(type, map, elem) (*(type*)((char*)boa_check_ptr(elem) + (map)->impl.val_offset))
+
+// -- boa_bmap
+
+boa_noinline boa_map_insert_result boa_bmap_insert(boa_map *map, const void *key);
+boa_noinline void *boa_bmap_find(boa_map *map, const void *key);
 
 #endif

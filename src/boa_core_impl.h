@@ -463,12 +463,12 @@ uint32_t boa__map_find_fallback(boa_map *map, uint32_t block_ix)
 	return block_ix;
 }
 
-boa_noinline boa_map_insert_result boa_map_insert(boa_map *map, const void *key, uint32_t hash, boa_cmp_fn cmp)
+boa_noinline boa_map_insert_result boa_map_insert(boa_map *map, const void *key, uint32_t hash, boa_map_cmp_fn cmp)
 {
 	return boa_map_insert_inline(map, key, hash, cmp);
 }
 
-boa_noinline void *boa_map_find(boa_map *map, const void *key, uint32_t hash, boa_cmp_fn cmp)
+boa_noinline void *boa_map_find(boa_map *map, const void *key, uint32_t hash, boa_map_cmp_fn cmp)
 {
 	return boa_map_find_inline(map, key, hash, cmp);
 }
@@ -592,6 +592,85 @@ void boa_map_reset(boa_map *map)
 		boa_free_ator(map->ator, map->impl.allocation);
 		map->impl.allocation = NULL;
 	}
+}
+
+// -- boa_bmap
+
+static uint32_t boa__bmap_hash(const void *key, uint32_t size)
+{
+	uint32_t x = 1;
+	const char *pa = (const char*)key;
+
+	if ((size & 3) == 0) {
+		while (size >= 4) {
+			x = boa_hash_combine(x, *(uint32_t*)pa);
+
+			size -= 4;
+			pa += 4;
+		}
+	}
+
+	while (size > 0) {
+		x = boa_hash_combine(x, (uint32_t)*pa);
+
+		size -= 1;
+		pa += 1;
+	}
+
+	x = ((x >> 16) ^ x) * 0x45d9f3b;
+	x = ((x >> 16) ^ x) * 0x45d9f3b;
+	x = (x >> 16) ^ x;
+	return x;
+}
+
+static int boa__bmap_cmp(const void *a, const void *b, boa_map *map)
+{
+	uint32_t size = map->key_size;
+	const char *pa = (const char*)a, *pb = (const char*)b;
+
+#if BOA_64BIT
+	if ((size & 7) == 0) {
+		while (size >= 8) {
+			if (*(uint64_t*)pa != *(uint64_t*)pb) return 0;
+
+			size -= 8;
+			pa += 8;
+			pb += 8;
+		}
+	}
+#endif
+
+	if ((size & 3) == 0) {
+		while (size >= 4) {
+			if (*(uint32_t*)pa != *(uint32_t*)pb) return 0;
+
+			size -= 4;
+			pa += 4;
+			pb += 4;
+		}
+	}
+
+	while (size > 0) {
+		if (*pa != *pb) return 0;
+
+		size -= 1;
+		pa += 1;
+		pb += 1;
+	}
+
+	return 1;
+}
+
+boa_noinline boa_map_insert_result boa_bmap_insert(boa_map *map, const void *key)
+{
+	uint32_t hash = boa__bmap_hash(key, map->key_size);
+	return boa_map_insert_inline(map, key, hash, &boa__bmap_cmp);
+}
+
+boa_noinline void *boa_bmap_find(boa_map *map, const void *key)
+{
+	uint32_t hash = boa__bmap_hash(key, map->key_size);
+	return boa_map_find_inline(map, key, hash, &boa__bmap_cmp);
 }
 
 #endif

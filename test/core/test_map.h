@@ -7,8 +7,8 @@ uint32_t g_hash_factor;
 int g_do_reserve;
 int g_insert_reversed;
 
-uint32_t int_hash(int i){ return i % 10000 * g_hash_factor; }
-int int_cmp(const void *a, const void *b){ return *(int*)a == *(int*)b; }
+uint32_t int_hash(int i) { return i % 10000 * g_hash_factor; }
+int int_cmp(const void *a, const void *b, boa_map *m) { return *(int*)a == *(int*)b; }
 
 void insert_int(boa_map *map, int k, int v)
 {

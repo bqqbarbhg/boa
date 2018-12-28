@@ -8,7 +8,7 @@ size_t std_hash_combine(size_t hash, size_t value)
 
 bool operator==(const int_pair &a, const int_pair &b)
 {
-	return pair_cmp(&a, &b);
+	return pair_cmp(&a, &b, 0);
 }
 
 namespace std {
