@@ -59,6 +59,76 @@ void init_square_map(boa_map *map, uint32_t count)
 	boa_assert(map->count == count);
 }
 
+typedef struct string_entry {
+	uint32_t length;
+	char *string;
+} string_entry;
+
+uint32_t string_hash(const char *str)
+{
+	uint32_t hash = 2166136261u;
+	for (; *str != 0; str++) {
+		hash = (hash ^ (uint32_t)*str) * 16777619u;
+	}
+	return hash;
+}
+
+int string_cmp(const void *a, const void *b, boa_map *m)
+{
+	const char *str = (const char *)a;
+	const string_entry *entry = (const string_entry*)b;
+	return !strcmp(str, entry->string);
+}
+
+void insert_string(boa_map *map, const char *str, int value)
+{
+	uint32_t hash = string_hash(str);
+	boa_map_insert_result ires = boa_map_insert_inline(map, str, hash, &string_cmp);
+	if (ires.inserted) {
+		string_entry *entry = &boa_key(string_entry, map, ires.value);
+		entry->length = (uint32_t)strlen(str);
+		entry->string = (char*)boa_alloc(entry->length + 1);
+		memcpy(entry->string, str, entry->length + 1);
+	}
+
+	boa_val(int, map, ires.value) = value;
+}
+
+int find_string(boa_map *map, const char *str)
+{
+	uint32_t hash = string_hash(str);
+	void *value = boa_map_find_inline(map, str, hash, &string_cmp);
+	if (value != NULL) {
+		string_entry *entry = &boa_key(string_entry, map, value);
+		boa_assert(!strcmp(entry->string, str));
+		return boa_val(int, map, value);
+	} else {
+		return -1;
+	}
+}
+
+void erase_string(boa_map *map, const char *str)
+{
+	uint32_t hash = string_hash(str);
+	void *value = boa_map_find_inline(map, str, hash, &string_cmp);
+	if (value != NULL) {
+		string_entry *entry = &boa_key(string_entry, map, value);
+		boa_assert(!strcmp(entry->string, str));
+		boa_free(entry->string);
+		boa_map_remove(map, value);
+	}
+}
+
+void string_map_reset(boa_map *map)
+{
+	boa_map_for (it, map) {
+		string_entry *entry = &boa_key(string_entry, map, it.value);
+		boa_free(entry->string);
+	}
+
+	boa_map_reset(map);
+}
+
 #else
 
 extern uint32_t g_hash_factor;
@@ -152,6 +222,31 @@ BOA_TEST(map_medium, "Insert a medium amount of keys")
 	for (uint32_t i = 0; i < count; i++) {
 		boa_test_hint_u32(i);
 		boa_assertf(find_int(map, i) == i * i, "Index: %i", i);
+	}
+
+	boa_map_reset(map);
+}
+
+BOA_TEST(map_medium_remove_half, "Remove half of the keys of a map and find the remaining ones")
+{
+	boa_map mapv = { 0 }, *map = &mapv;
+	uint32_t count = 1000;
+	init_square_map(map, count);
+
+	for (uint32_t i = 0; i < count; i += 2) {
+		erase_int(map, i);
+	}
+
+	boa_assert(map->count == count / 2);
+
+	for (uint32_t i = 0; i < count; i++) {
+		boa_test_hint_u32(i);
+		int val = find_int(map, i);
+		if (i % 2 == 0) {
+			boa_assert(val == -1);
+		} else {
+			boa_assert(val == i * i);
+		}
 	}
 
 	boa_map_reset(map);
@@ -442,7 +537,7 @@ BOA_TEST_BEGIN_PERMUTATION_U32(g_hash_factor, hash_factors_no_zero)
 BOA_TEST(map_large, "Insert a large amount of keys")
 {
 	boa_map mapv = { 0 }, *map = &mapv;
-	uint32_t count = 20000;
+	uint32_t count = 10000;
 	init_square_map(map, count);
 
 	for (uint32_t i = 0; i < count; i++) {
@@ -496,4 +591,60 @@ BOA_TEST(map_insert_alloc_fail_fallback, "Insert should fail gracefully on aux b
 	boa_map_reset(map);
 }
 
+BOA_TEST(string_map_simple, "Simple manual string map test")
+{
+	boa_map mapv = { 0 }, *map = &mapv;
+	map->key_size = sizeof(string_entry);
+	map->val_size = sizeof(int);
 
+	if (g_do_reserve)
+		boa_map_reserve(map, 32);
+
+	insert_string(map, "Hello", 10);
+	insert_string(map, "World", 20);
+
+	boa_assert(map->count == 2);
+
+	boa_assert(find_string(map, "Hello") == 10);
+	boa_assert(find_string(map, "World") == 20);
+	boa_assert(find_string(map, "What") == -1);
+
+	erase_string(map, "Hello");
+	boa_assert(map->count == 1);
+
+	boa_assert(find_string(map, "Hello") == -1);
+	boa_assert(find_string(map, "World") == 20);
+
+	string_map_reset(map);
+}
+
+BOA_TEST(string_map_medium, "String map test with medium amount of keys")
+{
+	boa_map mapv = { 0 }, *map = &mapv;
+	map->key_size = sizeof(string_entry);
+	map->val_size = sizeof(int);
+
+	uint32_t count = 1000;
+
+	if (g_do_reserve)
+		boa_map_reserve(map, count);
+
+	char fmtarr[128];
+	boa_buf fmtbuf = boa_array_buf(fmtarr);
+	for (uint32_t i = 0; i < count; i++) {
+		char *key = boa_format(boa_clear(&fmtbuf), "%u", i);
+		insert_string(map, key, i);
+	}
+
+	boa_assert(map->count == count);
+
+	for (uint32_t i = 0; i < count; i++) {
+		char *key = boa_format(boa_clear(&fmtbuf), "%u", i);
+		int val = find_string(map, key);
+		boa_assert(val == i);
+	}
+
+	boa_reset(&fmtbuf);
+
+	string_map_reset(map);
+}

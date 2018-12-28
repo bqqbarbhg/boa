@@ -678,6 +678,8 @@ boa_forceinline uint32_t boa_hash_combine(uint32_t hash, uint32_t value)
 #define boa_key(type, map, elem) (*(type*)boa_check_ptr(elem))
 #define boa_val(type, map, elem) (*(type*)((char*)boa_check_ptr(elem) + (map)->impl.val_offset))
 
+#define boa_map_for(name, map) for (boa_map_iterator name = boa_map_begin(map); name.value; boa_map_advance((map), &name))
+
 // -- boa_bmap
 
 boa_noinline boa_map_insert_result boa_bmap_insert(boa_map *map, const void *key);
