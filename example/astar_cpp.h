@@ -96,14 +96,6 @@ bool pathfind(boa::buf<point> &path, const map &map, point begin, point end, boa
 	work.enqueue({ 0.0f, 0 });
 
 	while (work.non_empty()) {
-		int num = 0;
-		for (auto &it : work.buf) {
-			boa_assert(it.score >= 0.0f);
-			boa_assert(it.state_pos % sizeof(state) == 0);
-			boa_assert(it.state_pos < states.end_pos);
-			num++;
-		}
-
 		work_item cur_work = work.dequeue();
 
 		state cur = states.from_pos(cur_work.state_pos);
@@ -138,7 +130,6 @@ bool pathfind(boa::buf<point> &path, const map &map, point begin, point end, boa
 			if (!closed.insert(pt).inserted) continue;
 
 			uint32_t next_pos = states.end_pos;
-			boa_assert(next_pos % sizeof(state) == 0);
 
 			state *next = states.push();
 			if (!next) return false;
@@ -148,7 +139,6 @@ bool pathfind(boa::buf<point> &path, const map &map, point begin, point end, boa
 
 			float score = next->distance + heuristic(pt, end);
 			if (!work.enqueue({ score, next_pos })) return false;
-			boa_assert(work.buf.end_pos % sizeof(work_item) == 0);
 		}
 	}
 
