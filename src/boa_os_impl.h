@@ -17,6 +17,7 @@
 	#include <Windows.h>
 #elif BOA_LINUX
 	#include <time.h>
+	#include <sys/time.h>
 #endif
 
 uint64_t boa_cycle_timestamp()
