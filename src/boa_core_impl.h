@@ -10,10 +10,6 @@
 #include <stdarg.h>
 #include <stdio.h>
 
-#if BOA_MSVC
-	#include <intrin.h>
-#endif
-
 // -- Utility
 
 uint32_t boa_round_pow2_up(uint32_t value)
@@ -27,19 +23,9 @@ uint32_t boa_round_pow2_up(uint32_t value)
 	return x + 1;
 }
 
-uint32_t boa_highest_bit(uint32_t value)
+void boa_swap(void *a, void *b, uint32_t size)
 {
-	boa_assert(value != 0);
-
-#if BOA_MSVC
-	unsigned long result;
-	_BitScanReverse(&result, value);
-	return result;
-#elif BOA_GNUC
-	return 31 - __builtin_clz(value);
-#else
-	#error "Unimplemented"
-#endif
+	boa_swap_inline(a, b, size);
 }
 
 // -- boa_allocator
@@ -133,6 +119,7 @@ void *boa__buf_grow(boa_buf *buf, uint32_t new_cap)
 		// Heap -> Heap: Just realloc() with optional header offset
 		uint32_t offset = (ator_flags & BOA_BUF_FLAG_HAS_BUFFER) ? sizeof(boa__buf_grow_header) : 0;
 		new_data = boa_realloc_ator(ator, (char*)old_data - offset, new_cap + offset);
+		if (new_data) new_data = (char*)new_data + offset;
 	} else {
 		if (old_data != NULL) {
 			// Fixed -> Heap: Create header and memcpy() data
@@ -149,7 +136,8 @@ void *boa__buf_grow(boa_buf *buf, uint32_t new_cap)
 			// Zero -> Heap: Just allocate a new buffer
 			new_data = boa_alloc_ator(ator, new_cap);
 		}
-		buf->ator_flags = ator_flags | BOA_BUF_FLAG_ALLOCATED;
+		ator_flags |= BOA_BUF_FLAG_ALLOCATED;
+		if (new_data) buf->ator_flags = ator_flags;
 	}
 
 	if (!new_data) return NULL;
@@ -661,6 +649,8 @@ static int boa__bmap_cmp(const void *a, const void *b, boa_map *map)
 	return 1;
 }
 
+// -- boa_bmap
+
 boa_noinline boa_map_insert_result boa_bmap_insert(boa_map *map, const void *key)
 {
 	uint32_t hash = boa__bmap_hash(key, map->key_size);
@@ -671,6 +661,18 @@ boa_noinline void *boa_bmap_find(boa_map *map, const void *key)
 {
 	uint32_t hash = boa__bmap_hash(key, map->key_size);
 	return boa_map_find_inline(map, key, hash, &boa__bmap_cmp);
+}
+
+// -- boa_heap
+
+void boa_upheap(void *values, uint32_t index, uint32_t size, boa_before_fn before, void *user)
+{
+	return boa_upheap_inline(values, index, size, before, user);
+}
+
+void boa_downheap(void *values, uint32_t end, uint32_t index, uint32_t size, boa_before_fn before, void *user)
+{
+	return boa_downheap_inline(values, end, index, size, before, user);
 }
 
 #endif

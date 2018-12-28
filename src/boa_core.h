@@ -71,6 +71,10 @@
 	#error "Unsupported OS"
 #endif
 
+#if BOA_MSVC
+	#include <intrin.h>
+#endif
+
 // -- Language
 
 #include <stddef.h>
@@ -146,7 +150,7 @@
 	#error "Custom assert defined without boa_assertf()"
 #endif
 
-boa_inline void *boa_check_ptr(const void *ptr)
+boa_forceinline void *boa_check_ptr(const void *ptr)
 {
 	boa_assert(ptr != NULL);
 	return (void*)ptr;
@@ -154,14 +158,71 @@ boa_inline void *boa_check_ptr(const void *ptr)
 
 // -- Utility
 
-boa_inline uint32_t boa_align_up(uint32_t value, uint32_t align)
+boa_forceinline uint32_t boa_align_up(uint32_t value, uint32_t align)
 {
 	boa_assert(align != 0 && (align & align - 1) == 0);
 	return (value + align - 1) & ~(align - 1);
 }
 
 uint32_t boa_round_pow2_up(uint32_t value);
-uint32_t boa_highest_bit(uint32_t value);
+
+boa_forceinline uint32_t boa_highest_bit(uint32_t value)
+{
+	boa_assert(value != 0);
+
+#if BOA_MSVC
+	unsigned long result;
+	_BitScanReverse(&result, value);
+	return result;
+#elif BOA_GNUC
+	return 31 - __builtin_clz(value);
+#else
+	#error "Unimplemented"
+#endif
+}
+
+boa_forceinline void boa_swap_inline(void *a, void *b, uint32_t size)
+{
+	char *pa = (char*)a, *pb = (char*)b;
+
+#if BOA_64BIT
+	if ((size & 7) == 0) {
+		while (size >= 8) {
+			uint64_t temp = *(uint64_t*)pa;
+			*(uint64_t*)pa = *(uint64_t*)pb;
+			*(uint64_t*)pb = temp;
+
+			size -= 8;
+			pa += 8;
+			pb += 8;
+		}
+	}
+#endif
+
+	if ((size & 3) == 0) {
+		while (size >= 4) {
+			uint32_t temp = *(uint32_t*)pa;
+			*(uint32_t*)pa = *(uint32_t*)pb;
+			*(uint32_t*)pb = temp;
+
+			size -= 4;
+			pa += 4;
+			pb += 4;
+		}
+	}
+
+	while (size > 0) {
+		char temp = *pa;
+		*pa = *pb;
+		*pb = temp;
+
+		size -= 1;
+		pa += 1;
+		pb += 1;
+	}
+}
+
+void boa_swap(void *a, void *b, uint32_t size);
 
 // -- boa_allocator
 
@@ -684,5 +745,90 @@ boa_forceinline uint32_t boa_hash_combine(uint32_t hash, uint32_t value)
 
 boa_noinline boa_map_insert_result boa_bmap_insert(boa_map *map, const void *key);
 boa_noinline void *boa_bmap_find(boa_map *map, const void *key);
+
+// -- boa_heap
+
+typedef int (*boa_before_fn)(const void *a, const void *b, void *user);
+
+boa_forceinline void boa_upheap_inline(void *values, uint32_t index, uint32_t size, boa_before_fn before, void *user)
+{
+	char *data = (char*)values;
+	void *index_v = data + index * size;
+	while (index > 0) {
+		uint32_t parent = (index - 1) >> 1;
+		void *parent_v = data + parent * size;
+		if (before(index_v, parent_v, user)) {
+			boa_swap_inline(parent_v, index_v, size);
+
+			index_v = parent_v;
+			index = parent;
+		} else {
+			break;
+		}
+	}
+}
+
+boa_forceinline void boa_downheap_inline(void *values, uint32_t end, uint32_t index, uint32_t size, boa_before_fn before, void *user)
+{
+	char *data = (char*)values;
+	uint32_t end_o = end;
+	uint32_t index_o = index * size;
+	uint32_t child_o = index_o * 2 + size;
+	while (child_o < end_o) {
+		void *index_v = data + index_o;
+		char *child_v = data + child_o;
+
+		if (child_o + size < end_o && before(child_v + size, child_v, user)) {
+			child_o += size;
+			child_v += size;
+		}
+
+		if (before(child_v, index_v, user)) {
+			boa_swap_inline(index_v, child_v, size);
+
+			index_o = child_o;
+			child_o = index_o * 2 + size;
+		} else {
+			break;
+		}
+	}
+}
+
+void boa_upheap(void *values, uint32_t index, uint32_t size, boa_before_fn before, void *user);
+void boa_downheap(void *values, uint32_t end, uint32_t index, uint32_t size, boa_before_fn before, void *user);
+
+// -- boa_pqueue
+
+boa_forceinline int boa_pqueue_enqueue_inline(boa_buf *buf, const void *value, uint32_t size, boa_before_fn before, void *user)
+{
+	uint32_t pos = buf->end_pos / size;
+	if (!boa_buf_push_data(buf, value, size)) return 0;
+	boa_upheap_inline(buf->data, pos, size, before, user);
+	return 1;
+}
+
+boa_forceinline void boa_pqueue_dequeue_inline(boa_buf *buf, void *value, uint32_t size, boa_before_fn before, void *user)
+{
+	boa_assert(buf->end_pos >= size);
+	memcpy(value, buf->data, size);
+	boa_buf_remove(buf, 0, size);
+	boa_downheap_inline(buf->data, buf->end_pos, 0, size, before, user);
+}
+
+boa_inline int boa_pqueue_enqueue(boa_buf *buf, const void *value, uint32_t size, boa_before_fn before, void *user)
+{
+	uint32_t pos = buf->end_pos / size;
+	if (!boa_buf_push_data(buf, value, size)) return 0;
+	boa_upheap(buf->data, pos, size, before, user);
+	return 1;
+}
+
+boa_inline void boa_pqueue_dequeue(boa_buf *buf, void *value, uint32_t size, boa_before_fn before, void *user)
+{
+	boa_assert(buf->end_pos >= size);
+	memcpy(value, buf->data, size);
+	boa_buf_remove(buf, 0, size);
+	boa_downheap(buf->data, buf->end_pos, 0, size, before, user);
+}
 
 #endif

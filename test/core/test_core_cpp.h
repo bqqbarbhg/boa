@@ -12,6 +12,10 @@ namespace {
 		bool operator==(const Point &rhs) const { return x == rhs.x && y == rhs.y; }
 		bool operator!=(const Point &rhs) const { return !(*this == rhs); }
 	};
+
+	struct IntGreater {
+		bool operator()(int a, int b) { return a > b; }
+	};
 }
 
 #endif
@@ -72,6 +76,7 @@ BOA_TEST(cpp_buf_range_for, "boa::buf<int> range for")
 		boa_assert(val == num);
 		num += 10;
 	}
+	boa_assert(num == 50);
 }
 
 BOA_TEST(cpp_buf_points, "Buffer of more complex types boa::buf<Point>")
@@ -96,4 +101,58 @@ BOA_TEST(cpp_format_buf, "boa::format() simple overload")
 	boa::buf<char> buf;
 	char *str = boa::format(buf, "Hello %s", "World");
 	boa_assert(strcmp(str, "Hello World") == 0);
+}
+
+BOA_TEST(cpp_pqueue, "C++ priority queue")
+{
+	boa::pqueue<int> pq;
+	for (int i : { 5, 1, 3, 2, 4 })
+		boa_assert(pq.enqueue(i) != 0);
+
+	boa_assert(pq.count() == 5);
+	boa_assert(pq.non_empty());
+
+	for (int i : { 1, 2, 3, 4, 5 })
+		boa_assert(pq.dequeue() == i);
+
+	boa_assert(pq.count() == 0);
+	boa_assert(pq.is_empty());
+	boa_expect_assert( pq.dequeue() );
+}
+
+BOA_TEST(cpp_pqueue_functor, "C++ priority queue with custom functor")
+{
+	boa::pqueue<int, IntGreater> pq;
+
+	for (int i : { 5, 1, 3, 2, 4 })
+		boa_assert(pq.enqueue(i) != 0);
+
+	boa_assert(pq.count() == 5);
+	boa_assert(pq.non_empty());
+
+	for (int i : { 5, 4, 3, 2, 1 })
+		boa_assert(pq.dequeue() == i);
+
+	boa_assert(pq.count() == 0);
+	boa_assert(pq.is_empty());
+	boa_expect_assert( pq.dequeue() );
+}
+
+BOA_TEST(cpp_pqueue_array, "C++ Array backed priority queue")
+{
+	int array[16];
+	boa::pqueue<int> pq{ boa::array_view(array) };
+
+	for (int i : { 5, 1, 3, 2, 4 })
+		boa_assert(pq.enqueue(i) != 0);
+
+	boa_assert(pq.count() == 5);
+	boa_assert(pq.non_empty());
+
+	for (int i : { 1, 2, 3, 4, 5 })
+		boa_assert(pq.dequeue() == i);
+
+	boa_assert(pq.count() == 0);
+	boa_assert(pq.is_empty());
+	boa_expect_assert( pq.dequeue() );
 }

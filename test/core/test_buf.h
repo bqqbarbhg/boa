@@ -67,7 +67,6 @@ BOA_TEST(buf_alloc_equal, "Equal sized allocation from buffer should not malloc(
 	boa_assert(buf.cap_pos == 64);
 }
 
-
 BOA_TEST(buf_alloc_large, "Larger allocation from buffer should malloc()")
 {
 	char data[64];
@@ -123,6 +122,34 @@ BOA_TEST(buf_reset_to_buffer, "reset() should reset the buffer back to prealloca
 	boa_assert(!buf_equal(&original, &buf));
 	boa_reset(&buf);
 	boa_assert(buf_equal(&original, &buf));
+}
+
+BOA_TEST(buf_reset_stack_fail_alloc, "reset() on a failed stack allocation should work")
+{
+	char data[16];
+	boa_buf original = boa_array_buf(data);
+	boa_buf buf = original;
+	boa_assert(buf.cap_pos == 16);
+	boa_test_fail_next_allocation();
+	boa_assert(boa_buf_reserve(&buf, 64) == NULL);
+	boa_reset(&buf);
+}
+
+BOA_TEST(buf_stack_grow, "Growing a stack-based buffer")
+{
+	char data[128];
+	boa_buf buf = boa_array_buf(data);
+	for (uint32_t i = 0; i < 1024; i++) {
+		boa_push_val(uint32_t, &buf, i * i);
+	}
+
+	boa_assert(boa_count(uint32_t, &buf) == 1024);
+
+	for (uint32_t i = 0; i < 1024; i++) {
+		boa_assert(boa_get(uint32_t, &buf, i) == i * i);
+	}
+
+	boa_reset(&buf);
 }
 
 BOA_TEST(buf_alloc_fail, "Failure on boa_buf_reserve()")

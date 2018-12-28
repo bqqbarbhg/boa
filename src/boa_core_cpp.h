@@ -5,11 +5,25 @@
 
 #include "boa_core.h"
 #include <type_traits>
+#include <utility>
+#include <functional>
 
 extern boa_allocator boa__null_ator;
 extern boa_allocator boa__default_ator;
 
 namespace boa {
+
+// -- boa_pod
+
+template <typename T>
+struct pod {
+	alignas(T) char data[sizeof(T)];
+
+	T& operator*() { return *(T*)data; }
+	const T& operator*() const { return *(const T*)data; }
+	T* operator->() { return (T*)data; }
+	const T* operator->() const { return (const T*)data; }
+};
 
 // -- boa_allocator
 
@@ -45,10 +59,10 @@ struct buf: boa_buf {
 	explicit buf(const boa_buf &b) : boa_buf(b) { }
 
 	T *begin() { return boa_begin(T, this); }
-	T *end() { return boa_begin(T, this); }
+	T *end() { return boa_end(T, this); }
 	T *cap() { return boa_cap(T, this); }
 	const T *begin() const { return boa_begin(const T, this); }
-	const T *end() const { return boa_begin(const T, this); }
+	const T *end() const { return boa_end(const T, this); }
 	const T *cap() const { return boa_cap(const T, this); }
 	buf<T>& clear() { boa_clear(this); return *this; }
 	buf<T>& reset() { boa_reset(this); return *this; }
@@ -59,6 +73,7 @@ struct buf: boa_buf {
 	T *push() { return boa_push(T, this); }
 	void bump() { return boa_bump(T, this); }
 	T *insert(uint32_t pos) { return boa_insert(T, this, pos); }
+	T &pop() { *boa_pop(T, this); }
 
 	void push(const T &value) { boa_push_val(T, this, value); }
 	void insert(uint32_t pos, const T &value) { boa_insert_val(T, this, pos, value); }
@@ -67,6 +82,7 @@ struct buf: boa_buf {
 	T *push_n(uint32_t count) { return boa_push_n(T, this, count); }
 	void bump_n(uint32_t count) { boa_bump_n(T, this, count); }
 	T *insert_n(uint32_t pos, uint32_t count) { return boa_insert_n(T, this, pos, count); }
+	T *pop_n(uint32_t count) { boa_pop_n(T, this, count); }
 
 	void remove(uint32_t pos) { boa_remove(T, this, pos); }
 
@@ -74,9 +90,17 @@ struct buf: boa_buf {
 	void erase_n(uint32_t pos, uint32_t count) { boa_erase_n(T, this, pos, count); }
 
 	T &operator[](uint32_t index) { return boa_get(T, this, index); }
-	const T &operator[](uint32_t index) const { return boa_get(const T, this, index); }
+	const T &operator[](uint32_t index) const { return boa_get(const T, (boa_buf*)this, index); }
 
 	uint32_t count() const { return boa_count(T, this); }
+	bool is_empty() const { return (bool)boa_is_empty(this); }
+	bool non_empty() const { return (bool)boa_non_empty(this); }
+
+	T &from_pos(uint32_t pos) {
+		boa_assert(pos % sizeof(T) == 0);
+		boa_assert(pos < end_pos);
+		return *(T*)((char*)data + pos);
+	}
 };
 
 template <typename T> inline buf<T>
@@ -125,6 +149,91 @@ inline char *format(boa_buf &buf, const char *fmt, Args... args) {
 template <typename T>
 T &check_ptr(T *t) { return *(T*)boa_check_ptr(t); }
 
+template <typename Key>
+struct bset: boa_map {
+	bset() {
+		count = 0;
+		capacity = 0;
+		impl.allocation = NULL;
+		ator = NULL;
+		key_size = sizeof(Key);
+		val_size = 0;
+	}
+
+	~bset() {
+		boa_map_reset(this);
+	}
+
+	struct insert_result {
+		Key *value;
+		bool inserted;
+	};
+
+	insert_result insert(const Key &key)
+	{
+		boa_map_insert_result ires = boa_bmap_insert(this, &key);
+		insert_result res = { (Key*)ires.value, (bool)ires.inserted };
+		if (res.inserted) *res.value = key;
+		return res;
+	}
+
+	Key *find(const Key &key)
+	{
+		return (Key*)boa_bmap_find(this, &key);
+	}
+};
+
+template <typename Key, typename Val>
+struct bmap: boa_map {
+	struct key_val {
+		Key key;
+		Val val;
+	};
+
+	struct insert_result {
+		key_val *value;
+		bool inserted;
+	};
+
+};
+
+// -- boa_pqueue
+
+template <typename T, typename F>
+boa_inline int boa__cpp_functor_before(const void *a, const void *b, void *user)
+{
+	return (*(F*)user)(*(const T*)a, *(const T*)b);
+}
+
+template <typename T, typename Before = std::less<T> >
+struct pqueue {
+	boa::buf<T> buf;
+	Before before;
+
+	pqueue() { }
+	explicit pqueue(boa::buf<T> &&buf) : buf(std::move(buf)) { }
+	pqueue(boa::buf<T> &&buf, Before before) : buf(std::move(buf)), before(before) { }
+
+	uint32_t count() const { return boa_count(T, &buf); }
+	bool is_empty() const { return (bool)boa_is_empty(&buf); }
+	bool non_empty() const { return (bool)boa_non_empty(&buf); }
+
+	bool enqueue(const T &value) {
+		int res = boa_pqueue_enqueue_inline(&buf, &value, sizeof(T), boa__cpp_functor_before<T, Before>, &before);
+		return res != 0;
+	}
+
+	T dequeue() {
+		pod<T> result;
+		boa_pqueue_dequeue_inline(&buf, &result, sizeof(T), boa__cpp_functor_before<T, Before>, &before);
+		return *result;
+	}
+};
+
+// -- Pod aliases
+
+template <typename T>
+using pod_buf = pod<buf<T>>;
 
 }
 
