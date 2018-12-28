@@ -69,13 +69,7 @@ bool pathfind(boa::buf<point> &path, const map &map, point begin, point end, boa
 {
 	// Edge case: Null path
 	if (begin == end) {
-		point *res = path.push();
-		if (res) {
-			*res = begin;
-			return true;
-		} else {
-			return false;
-		}
+		return path.try_push(begin);
 	}
 
 	state stack_states[64];
@@ -92,8 +86,11 @@ bool pathfind(boa::buf<point> &path, const map &map, point begin, point end, boa
 	initial.point = begin;
 	initial.distance = 0.0f;
 	initial.parent_pos  = ~0u;
-	states.push(initial);
-	work.enqueue({ 0.0f, 0 });
+
+	bool ok = true;
+	ok = ok && states.try_push(initial);
+	ok = ok && work.try_enqueue({ 0.0f, 0 });
+	if (!ok) return false;
 
 	while (work.non_empty()) {
 		work_item cur_work = work.dequeue();
@@ -138,7 +135,7 @@ bool pathfind(boa::buf<point> &path, const map &map, point begin, point end, boa
 			next->parent_pos = cur_work.state_pos;
 
 			float score = next->distance + heuristic(pt, end);
-			if (!work.enqueue({ score, next_pos })) return false;
+			if (!work.try_enqueue({ score, next_pos })) return false;
 		}
 	}
 

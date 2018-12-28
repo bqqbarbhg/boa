@@ -107,7 +107,7 @@ BOA_TEST(cpp_pqueue, "C++ priority queue")
 {
 	boa::pqueue<int> pq;
 	for (int i : { 5, 1, 3, 2, 4 })
-		boa_assert(pq.enqueue(i) != 0);
+		pq.enqueue(i);
 
 	boa_assert(pq.count() == 5);
 	boa_assert(pq.non_empty());
@@ -125,7 +125,7 @@ BOA_TEST(cpp_pqueue_functor, "C++ priority queue with custom functor")
 	boa::pqueue<int, IntGreater> pq;
 
 	for (int i : { 5, 1, 3, 2, 4 })
-		boa_assert(pq.enqueue(i) != 0);
+		pq.enqueue(i);
 
 	boa_assert(pq.count() == 5);
 	boa_assert(pq.non_empty());
@@ -144,7 +144,7 @@ BOA_TEST(cpp_pqueue_array, "C++ Array backed priority queue")
 	boa::pqueue<int> pq{ boa::array_view(array) };
 
 	for (int i : { 5, 1, 3, 2, 4 })
-		boa_assert(pq.enqueue(i) != 0);
+		pq.enqueue(i);
 
 	boa_assert(pq.count() == 5);
 	boa_assert(pq.non_empty());

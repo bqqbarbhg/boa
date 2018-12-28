@@ -75,6 +75,7 @@ struct buf: boa_buf {
 	T *insert(uint32_t pos) { return boa_insert(T, this, pos); }
 	T &pop() { *boa_pop(T, this); }
 
+	bool try_push(const T &value) { return (bool)boa_buf_push_data(this, &value, sizeof(T)); }
 	void push(const T &value) { boa_push_val(T, this, value); }
 	void insert(uint32_t pos, const T &value) { boa_insert_val(T, this, pos, value); }
 
@@ -218,7 +219,12 @@ struct pqueue {
 	bool is_empty() const { return (bool)boa_is_empty(&buf); }
 	bool non_empty() const { return (bool)boa_non_empty(&buf); }
 
-	bool enqueue(const T &value) {
+	void enqueue(const T &value) {
+		int res = boa_pqueue_enqueue_inline(&buf, &value, sizeof(T), boa__cpp_functor_before<T, Before>, &before);
+		boa_assert(res != 0);
+	}
+
+	bool try_enqueue(const T &value) {
 		int res = boa_pqueue_enqueue_inline(&buf, &value, sizeof(T), boa__cpp_functor_before<T, Before>, &before);
 		return res != 0;
 	}
