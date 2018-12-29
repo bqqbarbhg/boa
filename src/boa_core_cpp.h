@@ -249,6 +249,13 @@ struct set: Hasher {
 
 	insert_result<T> insert(const T &t) {
 		insert_result<T> ires = hasher_insert(&t);
+		boa_assert(ires.entry);
+		if (ires.inserted) *ires.entry = t;
+		return ires;
+	}
+
+	insert_result<T> try_insert(const T &t) {
+		insert_result<T> ires = hasher_insert(&t);
 		if (ires.inserted) *ires.entry = t;
 		return ires;
 	}
@@ -283,6 +290,16 @@ struct map: Hasher {
 
 	insert_result<key_val> insert(const Key &key, const Val &val) {
 		insert_result<key_val> ires = hasher_insert(&key);
+		boa_assert(ires.entry);
+		if (ires.inserted) {
+			ires.entry->key = key;
+			ires.entry->val = val;
+		}
+		return ires;
+	}
+
+	insert_result<key_val> try_insert(const Key &key, const Val &val) {
+		insert_result<key_val> ires = hasher_insert(&key);
 		if (ires.inserted) {
 			ires.entry->key = key;
 			ires.entry->val = val;
@@ -291,6 +308,14 @@ struct map: Hasher {
 	}
 
 	insert_result<key_val> insert_or_assign(const Key &key, const Val &val) {
+		insert_result<key_val> ires = hasher_insert(&key);
+		boa_assert(ires.entry);
+		if (ires.inserted) ires.entry->key = key;
+		ires.entry->val = val;
+		return ires;
+	}
+
+	insert_result<key_val> try_insert_or_assign(const Key &key, const Val &val) {
 		insert_result<key_val> ires = hasher_insert(&key);
 		if (ires.inserted) ires.entry->key = key;
 		if (ires.entry) ires.entry->val = val;

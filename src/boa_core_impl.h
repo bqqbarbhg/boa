@@ -553,7 +553,7 @@ void *boa__map_remove_non_iter(boa_map *map, void *value)
 
 boa_map_iterator boa_map_iterate_from(boa_map *map, void *entry)
 {
-	uint32_t element = boa__map_element_from_kv(map, value);
+	uint32_t element = boa__map_element_from_kv(map, entry);
 	uint32_t block_ix = element >> map->impl.element_block_shift;
 	return boa__map_find_block_start(map, block_ix);
 }
