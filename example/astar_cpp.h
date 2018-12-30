@@ -75,7 +75,7 @@ bool pathfind(boa::buf<point> &path, const map &map, point begin, point end, boa
 	state stack_states[64];
 	work_item stack_work[64];
 
-	boa::bset<point> closed;
+	boa::blit_map<point, float> closed;
 	boa::buf<state> states{ boa::array_buf_ator(stack_states, ator) };
 	boa::pqueue<work_item> work{ boa::array_buf_ator(stack_work, ator) };
 
@@ -124,14 +124,23 @@ bool pathfind(boa::buf<point> &path, const map &map, point begin, point end, boa
 			point pt = cur.point + dir;
 			float weight = map.weight(pt);
 			if (weight == INFINITY) continue;
-			if (!closed.insert(pt).inserted) continue;
+
+			float distance = cur.distance + weight;
+			auto ires = closed.try_insert_uninitialized(pt);
+			if (!ires.entry) return false;
+			if (ires.inserted || distance < ires.entry->val) {
+				ires.entry->key = pt;
+				ires.entry->val = distance;
+			} else {
+				continue;
+			}
 
 			uint32_t next_pos = states.end_pos;
 
 			state *next = states.push();
 			if (!next) return false;
 			next->point = pt;
-			next->distance = cur.distance + weight;
+			next->distance = distance;
 			next->parent_pos = cur_work.state_pos;
 
 			float score = next->distance + heuristic(pt, end);

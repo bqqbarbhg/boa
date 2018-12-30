@@ -153,14 +153,21 @@ T &check_ptr(T *t) { return *(T*)boa_check_ptr(t); }
 // -- boa_map
 
 struct blit_hasher: boa_map {
+	uint32_t blit_key_size;
+
 	template <typename T> static constexpr
 	bool hasher_compatible() { return true; }
 
+	template <typename T>
+	void hasher_init() {
+		blit_key_size = sizeof(T);
+	}
+
 	boa_map_insert_result hasher_insert(const void *key) {
-		return boa_blit_map_insert(this, key);
+		return boa_blit_map_insert(this, key, blit_key_size);
 	}
 	void *hasher_find(const void *key) {
-		return boa_blit_map_find(this, key);
+		return boa_blit_map_find(this, key, blit_key_size);
 	}
 };
 
@@ -168,11 +175,14 @@ struct ptr_hasher: boa_map {
 	template <typename T> static constexpr
 	bool hasher_compatible() { return sizeof(T) == sizeof(void*); }
 
+	template <typename T>
+	void hasher_init() { }
+
 	boa_map_insert_result hasher_insert(const void *key) {
-		return boa_ptr_map_insert(this, *(const void*)key);
+		return boa_ptr_map_insert(this, *(const void**)key);
 	}
 	void *hasher_find(const void *key) {
-		return boa_ptr_map_find(this, *(const void*)key);
+		return boa_ptr_map_find(this, *(const void**)key);
 	}
 };
 
@@ -180,11 +190,73 @@ struct u32_hasher: boa_map {
 	template <typename T> static constexpr
 	bool hasher_compatible() { return sizeof(T) == sizeof(uint32_t); }
 
+	template <typename T>
+	void hasher_init() { }
+
 	boa_map_insert_result hasher_insert(const void *key) {
 		return boa_u32_map_insert(this, *(const uint32_t*)key);
 	}
 	void *hasher_find(const void *key) {
 		return boa_u32_map_find(this, *(const uint32_t*)key);
+	}
+};
+
+struct virtual_hasher: boa_map {
+	boa_map_cmp_fn virtual_cmp_fn;
+	boa_map_hash_fn virtual_hash_fn;
+
+	template <typename T> static constexpr
+	bool hasher_compatible() { return true; }
+
+	template <typename T>
+	static int virtual_equal(const void *a, const void *b, void *user) {
+		return *(const T*)a == *(const T*)b;
+	}
+
+	template <typename T>
+	static int virtual_hash(const void *a, void *user) {
+		return hash(*(const T*)a);
+	}
+
+	template <typename T>
+	void hasher_init() {
+		virtual_cmp_fn = &virtual_equal<T>;
+		virtual_hash_fn = &virtual_hash<T>;
+	}
+
+	boa_map_insert_result hasher_insert(const void *key) {
+		uint32_t hash = virtual_hash_fn(key, NULL);
+		return boa_map_insert(this, key, hash, virtual_cmp_fn, NULL);
+	}
+	void *hasher_find(const void *key) {
+		uint32_t hash = virtual_hash_fn(key, NULL);
+		return boa_map_find(this, key, hash, virtual_cmp_fn, NULL);
+	}
+};
+
+template <typename T>
+struct inline_hasher: boa_map {
+	template <typename Tref> static constexpr
+	bool hasher_compatible() { return std::is_same<T, Tref>::value; }
+
+	static int inline_equal(const void *a, const void *b, void *user) {
+		return *(const T*)a == *(const T*)b;
+	}
+
+	static int inline_hash(const void *a) {
+		return hash(*(const T*)a);
+	}
+
+	template <typename Tref>
+	void hasher_init() { }
+
+	boa_map_insert_result hasher_insert(const void *key) {
+		uint32_t hash = virtual_hash_fn(key);
+		return boa_map_insert(this, key, hash, &inline_equal);
+	}
+	void *hasher_find(const void *key) {
+		uint32_t hash = inline_hash(key);
+		return boa_map_find(this, key, hash, &inline_equal);
 	}
 };
 
@@ -231,12 +303,13 @@ struct map_iterator: boa_map_iterator {
 
 template <typename Hasher, typename T>
 struct set: Hasher {
-	static_assert(Hasher::hasher_compatible<T>(), "Hasher is incompatible with the type");
+	static_assert(Hasher::template hasher_compatible<T>(), "Hasher is incompatible with the type");
 
 	typedef map_iterator<T> iterator;
 
 	set() {
 		boa_map_init(this, sizeof(T));
+		hasher_init<T>();
 	}
 
 	~set() {
@@ -248,14 +321,14 @@ struct set: Hasher {
 	}
 
 	insert_result<T> insert(const T &t) {
-		insert_result<T> ires = hasher_insert(&t);
+		insert_result<T> ires { hasher_insert(&t) };
 		boa_assert(ires.entry);
 		if (ires.inserted) *ires.entry = t;
 		return ires;
 	}
 
 	insert_result<T> try_insert(const T &t) {
-		insert_result<T> ires = hasher_insert(&t);
+		insert_result<T> ires { hasher_insert(&t) };
 		if (ires.inserted) *ires.entry = t;
 		return ires;
 	}
@@ -271,13 +344,14 @@ struct set: Hasher {
 
 template <typename Hasher, typename Key, typename Val>
 struct map: Hasher {
-	static_assert(Hasher::hasher_compatible<Key>(), "Hasher is incompatible with the key type");
+	static_assert(Hasher::template hasher_compatible<Key>(), "Hasher is incompatible with the key type");
 
 	typedef key_val<Key, Val> key_val;
 	typedef map_iterator<key_val> iterator;
 
 	map() {
 		boa_map_init(this, sizeof(key_val));
+		hasher_init<Key>();
 	}
 
 	~map() {
@@ -285,11 +359,18 @@ struct map: Hasher {
 	}
 
 	insert_result<key_val> insert_uninitialized(const Key &key) {
-		return hasher_insert(&key);
+		insert_result<key_val> ires { hasher_insert(&key) };
+		boa_assert(ires.entry);
+		return ires;
+	}
+
+	insert_result<key_val> try_insert_uninitialized(const Key &key) {
+		insert_result<key_val> ires { hasher_insert(&key) };
+		return ires;
 	}
 
 	insert_result<key_val> insert(const Key &key, const Val &val) {
-		insert_result<key_val> ires = hasher_insert(&key);
+		insert_result<key_val> ires { hasher_insert(&key) };
 		boa_assert(ires.entry);
 		if (ires.inserted) {
 			ires.entry->key = key;
@@ -299,7 +380,7 @@ struct map: Hasher {
 	}
 
 	insert_result<key_val> try_insert(const Key &key, const Val &val) {
-		insert_result<key_val> ires = hasher_insert(&key);
+		insert_result<key_val> ires { hasher_insert(&key) };
 		if (ires.inserted) {
 			ires.entry->key = key;
 			ires.entry->val = val;
@@ -308,7 +389,7 @@ struct map: Hasher {
 	}
 
 	insert_result<key_val> insert_or_assign(const Key &key, const Val &val) {
-		insert_result<key_val> ires = hasher_insert(&key);
+		insert_result<key_val> ires { hasher_insert(&key) };
 		boa_assert(ires.entry);
 		if (ires.inserted) ires.entry->key = key;
 		ires.entry->val = val;
@@ -316,7 +397,7 @@ struct map: Hasher {
 	}
 
 	insert_result<key_val> try_insert_or_assign(const Key &key, const Val &val) {
-		insert_result<key_val> ires = hasher_insert(&key);
+		insert_result<key_val> ires { hasher_insert(&key) };
 		if (ires.inserted) ires.entry->key = key;
 		if (ires.entry) ires.entry->val = val;
 		return ires;
@@ -334,9 +415,13 @@ struct map: Hasher {
 template <typename T> using blit_set = set<blit_hasher, T>;
 template <typename T> using ptr_set = set<ptr_hasher, T>;
 template <typename T> using u32_set = set<u32_hasher, T>;
+template <typename T> using virtual_set = set<virtual_hasher, T>;
+template <typename T> using inline_set = set<inline_hasher<T>, T>;
 template <typename Key, typename Val> using blit_map = map<blit_hasher, Key, Val>;
 template <typename Key, typename Val> using ptr_map = map<ptr_hasher, Key, Val>;
 template <typename Key, typename Val> using u32_map = map<u32_hasher, Key, Val>;
+template <typename Key, typename Val> using virtual_map = map<virtual_hasher, Key, Val>;
+template <typename Key, typename Val> using inline_map = map<inline_hasher<Key>, Key, Val>;
 
 // -- boa_pqueue
 
