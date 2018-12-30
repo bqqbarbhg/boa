@@ -75,12 +75,12 @@ bool pathfind(boa::buf<point> &path, const map &map, point begin, point end, boa
 	state stack_states[64];
 	work_item stack_work[64];
 
-	boa::blit_map<point, float> closed;
+	boa::blit_map<point, float> closed{ ator };
 	boa::buf<state> states{ boa::array_buf_ator(stack_states, ator) };
 	boa::pqueue<work_item> work{ boa::array_buf_ator(stack_work, ator) };
 
-	// TODO: Allocator + stack constructor
-	closed.ator = ator;
+	uint32_t min_path = std::abs(end.x - begin.x) + std::abs(end.y - begin.y);
+	closed.reserve(min_path);
 
 	state initial;
 	initial.point = begin;

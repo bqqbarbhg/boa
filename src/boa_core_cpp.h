@@ -312,8 +312,17 @@ struct set: Hasher {
 		hasher_init<T>();
 	}
 
+	explicit set(boa_allocator *ator) {
+		boa_map_init_ator(this, sizeof(T), ator);
+		hasher_init<T>();
+	}
+
 	~set() {
 		boa_map_reset(this);
+	}
+
+	void reserve(uint32_t capacity) {
+		boa_map_reserve(this, capacity);
 	}
 
 	insert_result<T> insert_uninitialized(const T &t) {
@@ -354,8 +363,17 @@ struct map: Hasher {
 		hasher_init<Key>();
 	}
 
+	explicit map(boa_allocator *ator) {
+		boa_map_init_ator(this, sizeof(key_val), ator);
+		hasher_init<Key>();
+	}
+
 	~map() {
 		boa_map_reset(this);
+	}
+
+	void reserve(uint32_t capacity) {
+		boa_map_reserve(this, capacity);
 	}
 
 	insert_result<key_val> insert_uninitialized(const Key &key) {
