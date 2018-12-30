@@ -247,19 +247,7 @@ int boa_format_u32(boa_buf *buf, const void *data, size_t size)
 	return boa_format(buf, "%u", *(const uint32_t*)data) ? 1 : 0;
 }
 
-static void boa__map_free_data(boa_map *map)
-{
-	if (map->impl.flags & BOA__MAP_FLAG_ALLOCATED) {
-		char *ptr = (char*)map->impl.blocks;
-		if (map->impl.flags & BOA__MAP_FLAG_HAS_BUFFER) {
-			uint32_t header_size = boa_align_up(sizeof(boa__map_storage_header), 8);
-			ptr -= header_size;
-		}
-		boa_free_ator(map->ator, ptr);
-	}
-}
-
-static int boa__map_allocate(boa_map *map, uint32_t prev_blocks, void *storage, size_t storage_size)
+static int boa__map_allocate(boa_map *map, uint32_t prev_blocks)
 {
 	uint32_t num_total_blocks = map->impl.num_total_blocks;
 	uint32_t block_num_entries = map->impl.block_num_entries;
@@ -270,48 +258,21 @@ static int boa__map_allocate(boa_map *map, uint32_t prev_blocks, void *storage, 
 	uint32_t hcs_size = boa_align_up(num_total_blocks * block_num_entries * sizeof(uint32_t), 8);
 	uint32_t entry_size = boa_align_up(num_total_blocks * block_num_entries * map->entry_size, 8);
 
-	uint32_t header_size = 0;
-	if (map->impl.flags & BOA__MAP_FLAG_HAS_BUFFER) {
-		header_size = boa_align_up(sizeof(boa__map_storage_header), 8);
-	}
-
 	uint32_t block_offset = 0;
 	uint32_t es_offset = block_offset + block_size;
 	uint32_t hcs_offset = es_offset + es_size;
 	uint32_t entry_offset = hcs_offset + hcs_size;
-	uint32_t total_size = entry_offset + entry_size + header_size;
+	uint32_t total_size = entry_offset + entry_size;
 
-	char *ptr;
-
-	if (storage) {
-		boa_assert(total_size <= storage_size);
-		ptr = (char*)storage;
-	} else {
-		ptr = (char*)boa_alloc_ator(map->ator, total_size);
-		if (!ptr) return 0;
-		map->impl.flags |= BOA__MAP_FLAG_ALLOCATED;
-		ptr += header_size;
-	}
-
-	char *old_ptr = (char*)map->impl.blocks;
-	if (header_size > 0) {
-		boa__map_storage_header *new_header = (boa__map_storage_header*)(ptr - header_size);
-		if (storage) {
-			new_header->pointer = storage;
-			new_header->size = storage_size;
-		} else {
-			old_ptr -= header_size;
-			boa__map_storage_header *old_header = (boa__map_storage_header*)old_ptr;
-			*new_header = *old_header;
-		}
-	}
+	char *ptr = (char*)boa_alloc_ator(map->ator, total_size);
+	if (!ptr) return 0;
 
 	if (prev_blocks) {
 		memcpy(ptr + block_offset, map->impl.blocks, prev_blocks * sizeof(boa__map_block));
 		memcpy(ptr + es_offset, map->impl.entry_slot, prev_blocks * block_num_slots * sizeof(uint16_t));
 		memcpy(ptr + hcs_offset, map->impl.hash_cur_slot, prev_blocks * block_num_entries * sizeof(uint32_t));
 		memcpy(ptr + entry_offset, map->impl.entries, prev_blocks * block_num_entries * map->entry_size);
-		boa_free_ator(map->ator, old_ptr);
+		boa_free_ator(map->ator, map->impl.blocks);
 	}
 
 	map->impl.blocks = (boa__map_block*)(ptr + block_offset);
@@ -320,42 +281,6 @@ static int boa__map_allocate(boa_map *map, uint32_t prev_blocks, void *storage, 
 	map->impl.entries = (void*)(ptr + entry_offset);
 
 	return 1;
-}
-
-void boa__map_setup_storage(boa_map *map, void *storage, size_t storage_size)
-{
-	if (storage_size >= INT_MAX)
-		storage_size = INT_MAX;
-
-	// Assume only one block needed, add 8 for padding between slots and entries
-	uint32_t fixed_overhead = boa_align_up(sizeof(boa__map_storage_header), 8)
-		+ boa_align_up(sizeof(boa__map_block), 8) + 8;
-	uint32_t bytes_per_entry = map->entry_size + 2 * sizeof(uint16_t) + sizeof(uint32_t);
-
-	int max_entries = ((int)storage_size - (int)fixed_overhead) / (int)bytes_per_entry;
-
-	if (max_entries > BOA__MAP_BLOCK_MAX_ENTRIES) {
-		// Multiple blocks needed, assume current amount of entries
-		uint32_t num_blocks = (uint32_t)max_entries / BOA__MAP_BLOCK_MAX_ENTRIES;
-		fixed_overhead += boa_align_up(sizeof(boa__map_block) * num_blocks, 8);
-		max_entries = ((int)storage_size - (int)fixed_overhead) / (int)bytes_per_entry;
-
-		// Multiple blocks fit less entries than one block: Just use one full block
-		uint32_t num_entries = boa_round_pow2_down((uint32_t)max_entries);
-		if (num_entries < BOA__MAP_BLOCK_MAX_ENTRIES)
-			max_entries = BOA__MAP_BLOCK_MAX_ENTRIES;
-	}
-
-	if (max_entries >= 1) {
-		uint32_t num_entries = boa_round_pow2_down((uint32_t)max_entries);
-		map->impl.flags = BOA__MAP_FLAG_HAS_BUFFER;
-		int res = boa__map_allocate(map, 0, storage, storage_size);
-		boa_assert(res != 0);
-
-		uint32_t block_num_slots = map->impl.block_num_entries << 1;
-		memset(map->impl.entry_slot, 0, sizeof(uint16_t) * block_num_slots * map->impl.num_hash_blocks);
-		memset(map->impl.blocks, 0, sizeof(boa__map_block) * map->impl.num_hash_blocks);
-	}
 }
 
 static void boa__map_insert_no_find(boa_map *map, uint32_t hash, const void *data)
@@ -464,7 +389,7 @@ int boa_map_reserve(boa_map *map, uint32_t capacity)
 	boa_assert(new_map.impl.block_num_entries <= BOA__MAP_BLOCK_MAX_ENTRIES);
 	boa_assert(block_num_slots <= BOA__MAP_BLOCK_MAX_SLOTS);
 
-	if (!boa__map_allocate(&new_map, 0, NULL, 0)) return 0;
+	if (!boa__map_allocate(&new_map, 0)) return 0;
 
 	memset(new_map.impl.entry_slot, 0, sizeof(uint16_t) * block_num_slots * new_map.impl.num_hash_blocks);
 	memset(new_map.impl.blocks, 0, sizeof(boa__map_block) * new_map.impl.num_hash_blocks);
@@ -492,7 +417,9 @@ int boa_map_reserve(boa_map *map, uint32_t capacity)
 		}
 	}
 
-	boa__map_free_data(map);
+	if (map->impl.blocks) {
+		boa_free_ator(map->ator, map->impl.blocks);
+	}
 
 	*map = new_map;
 	return 1;
@@ -512,7 +439,7 @@ uint32_t boa__map_find_fallback(boa_map *map, uint32_t block_ix)
 				if (num_aux <= 1) num_aux = 2;
 
 				map->impl.num_total_blocks += num_aux;
-				if (!boa__map_allocate(map, prev_blocks, NULL, 0)) return ~0u;
+				if (!boa__map_allocate(map, prev_blocks)) return ~0u;
 
 				// Reload invalidated the pointer
 				block = &map->impl.blocks[block_ix];
@@ -660,17 +587,9 @@ void boa_map_reset(boa_map *map)
 {
 	map->count = 0;
 	map->capacity = 0;
-	if (map->impl.flags & BOA__MAP_FLAG_ALLOCATED) {
-		char *ptr = (char*)map->impl.blocks;
-		if (map->impl.flags & BOA__MAP_FLAG_HAS_BUFFER) {
-			uint32_t header_size = boa_align_up(sizeof(boa__map_storage_header), 8);
-			ptr -= header_size;
-			boa__map_storage_header *header = (boa__map_storage_header*)ptr;
-			boa__map_setup_storage(map, header->pointer, header->size);
-		} else {
-			map->impl.flags = 0;
-		}
-		boa_free_ator(map->ator, ptr);
+	if (map->impl.blocks) {
+		boa_free_ator(map->ator, map->impl.blocks);
+		map->impl.blocks = NULL;
 	}
 }
 

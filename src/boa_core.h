@@ -467,9 +467,6 @@ int boa_format_u32(boa_buf *buf, const void *data, size_t size);
 #define BOA__MAP_BLOCK_MAX_SLOTS 128
 #define BOA__MAP_BLOCK_MAX_ENTRIES 64
 
-#define BOA__MAP_FLAG_ALLOCATED 1
-#define BOA__MAP_FLAG_HAS_BUFFER 2
-
 typedef struct boa__map_impl {
 	uint32_t num_hash_blocks;   // < Number of primary blocks in the map, must be a power of two.
 	uint32_t num_total_blocks;  // < Total number of (primary + auxilary) blocks
@@ -477,7 +474,6 @@ typedef struct boa__map_impl {
 
 	uint8_t block_num_entries; // < Number of user visible entries in a block
 	uint8_t entry_block_shift; // < How much to shift by to get from an entry to its block
-	uint8_t flags;             // < State flags
 
 	// Block metadata, also the root of the allocation to be freed
 	struct boa__map_block *blocks;
@@ -513,11 +509,6 @@ typedef struct boa__map_block {
 	uint32_t count;    // < Number of elements in this block
 } boa__map_block;
 
-typedef struct boa__map_storage_header {
-	void *pointer;
-	size_t size;
-} boa__map_storage_header;
-
 // Return non-zero if `key` is equal to `entry`
 typedef int (*boa_map_cmp_fn)(const void *key, const void *entry, void *user);
 
@@ -538,7 +529,6 @@ uint32_t boa__map_find_fallback(boa_map *map, uint32_t block_ix);
 boa_map_iterator boa__map_find_block_start(boa_map *map, uint32_t block_ix);
 void *boa__map_remove_non_iter(boa_map *map, void *value);
 boa_map_iterator boa__map_find_next(boa_map *map, void *value);
-void boa__map_setup_storage(boa_map *map, void *storage, size_t storage_size);
 
 #define boa__map_block_num_slots(map) ((map)->impl.block_num_entries << 1)
 
@@ -563,7 +553,7 @@ boa_inline void boa_map_init_ator(boa_map *map, size_t entry_size, boa_allocator
 	map->count = 0;
 	map->capacity = 0;
 	map->entry_size = (uint32_t)entry_size;
-	map->impl.flags = 0;
+	map->impl.blocks = NULL;
 }
 
 // Initialize `map` to hold entries of size `entry_size`
@@ -572,19 +562,7 @@ boa_inline void boa_map_init(boa_map *map, size_t entry_size) {
 	map->count = 0;
 	map->capacity = 0;
 	map->entry_size = (uint32_t)entry_size;
-	map->impl.flags = 0;
-}
-
-// Initialize `map` to hold entries of size `entry_size`, with a pre-allocated buffer
-boa_inline void boa_map_init_storage(boa_map *map, size_t entry_size, void *storage, size_t storage_size) {
-	boa_map_init(map, entry_size);
-	boa__map_setup_storage(map, storage, storage_size);
-}
-
-// Initialize `map` to hold entries of size `entry_size`, with a pre-allocated buffer using `ator` for allocations
-boa_inline void boa_map_init_storage_ator(boa_map *map, size_t entry_size, void *storage, size_t storage_size, boa_allocator *ator) {
-	boa_map_init_ator(map, entry_size, ator);
-	boa__map_setup_storage(map, storage, storage_size);
+	map->impl.blocks = NULL;
 }
 
 // Reserve `capacity` entries to insert into. Note: Does not guarantee that the map doesn't
