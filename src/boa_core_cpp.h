@@ -251,7 +251,7 @@ struct inline_hasher: boa_map {
 	void hasher_init() { }
 
 	boa_map_insert_result hasher_insert(const void *key) {
-		uint32_t hash = virtual_hash_fn(key);
+		uint32_t hash = inline_hash(key);
 		return boa_map_insert(this, key, hash, &inline_equal);
 	}
 	void *hasher_find(const void *key) {
@@ -309,12 +309,12 @@ struct set: Hasher {
 
 	set() {
 		boa_map_init(this, sizeof(T));
-		hasher_init<T>();
+		this->template hasher_init<T>();
 	}
 
 	explicit set(boa_allocator *ator) {
 		boa_map_init_ator(this, sizeof(T), ator);
-		hasher_init<T>();
+		this->template hasher_init<T>();
 	}
 
 	~set() {
@@ -326,24 +326,24 @@ struct set: Hasher {
 	}
 
 	insert_result<T> insert_uninitialized(const T &t) {
-		return hasher_insert(&t);
+		return this->hasher_insert(&t);
 	}
 
 	insert_result<T> insert(const T &t) {
-		insert_result<T> ires { hasher_insert(&t) };
+		insert_result<T> ires { this->hasher_insert(&t) };
 		boa_assert(ires.entry);
 		if (ires.inserted) *ires.entry = t;
 		return ires;
 	}
 
 	insert_result<T> try_insert(const T &t) {
-		insert_result<T> ires { hasher_insert(&t) };
+		insert_result<T> ires { this->hasher_insert(&t) };
 		if (ires.inserted) *ires.entry = t;
 		return ires;
 	}
 
 	T *find(const T &t) {
-		return (T*)hasher_find(&t);
+		return (T*)this->hasher_find(&t);
 	}
 
 	iterator begin() { return boa_map_begin(this); }
@@ -360,12 +360,12 @@ struct map: Hasher {
 
 	map() {
 		boa_map_init(this, sizeof(key_val));
-		hasher_init<Key>();
+		this->template hasher_init<Key>();
 	}
 
 	explicit map(boa_allocator *ator) {
 		boa_map_init_ator(this, sizeof(key_val), ator);
-		hasher_init<Key>();
+		this->template hasher_init<Key>();
 	}
 
 	~map() {
@@ -377,18 +377,18 @@ struct map: Hasher {
 	}
 
 	insert_result<key_val> insert_uninitialized(const Key &key) {
-		insert_result<key_val> ires { hasher_insert(&key) };
+		insert_result<key_val> ires { this->hasher_insert(&key) };
 		boa_assert(ires.entry);
 		return ires;
 	}
 
 	insert_result<key_val> try_insert_uninitialized(const Key &key) {
-		insert_result<key_val> ires { hasher_insert(&key) };
+		insert_result<key_val> ires { this->hasher_insert(&key) };
 		return ires;
 	}
 
 	insert_result<key_val> insert(const Key &key, const Val &val) {
-		insert_result<key_val> ires { hasher_insert(&key) };
+		insert_result<key_val> ires { this->hasher_insert(&key) };
 		boa_assert(ires.entry);
 		if (ires.inserted) {
 			ires.entry->key = key;
@@ -398,7 +398,7 @@ struct map: Hasher {
 	}
 
 	insert_result<key_val> try_insert(const Key &key, const Val &val) {
-		insert_result<key_val> ires { hasher_insert(&key) };
+		insert_result<key_val> ires { this->hasher_insert(&key) };
 		if (ires.inserted) {
 			ires.entry->key = key;
 			ires.entry->val = val;
@@ -407,7 +407,7 @@ struct map: Hasher {
 	}
 
 	insert_result<key_val> insert_or_assign(const Key &key, const Val &val) {
-		insert_result<key_val> ires { hasher_insert(&key) };
+		insert_result<key_val> ires { this->hasher_insert(&key) };
 		boa_assert(ires.entry);
 		if (ires.inserted) ires.entry->key = key;
 		ires.entry->val = val;
@@ -415,7 +415,7 @@ struct map: Hasher {
 	}
 
 	insert_result<key_val> try_insert_or_assign(const Key &key, const Val &val) {
-		insert_result<key_val> ires { hasher_insert(&key) };
+		insert_result<key_val> ires { this->hasher_insert(&key) };
 		if (ires.inserted) ires.entry->key = key;
 		if (ires.entry) ires.entry->val = val;
 		return ires;
