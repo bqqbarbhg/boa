@@ -287,8 +287,31 @@ BOA_TEST(utf16to8_truncate, "Converting should handle truncated output")
 	boa_assert(ptr == data + 2);
 	boa_assert(dst.end_pos == 2);
 	boa_assert(!memcmp((char*)dst.data, "AB", 2));
+}
 
-	boa_reset(&dst);
+BOA_TEST(utf16to8_view_fit, "Converting should succeed with no bytes to spare")
+{
+	uint16_t data[] = { (uint16_t)'A', (uint16_t)'B', (uint16_t)'C', (uint16_t)'D', 0 };
+	const uint16_t *ptr = data;
+	char result[5];
+	boa_buf dst = boa_array_view(result);
+	int res;
+
+	ptr = data;
+	res = boa_convert_utf16_to_utf8(boa_clear(&dst), &ptr, boa_arrayend(data) - 1);
+
+	boa_assert(res != 0);
+	boa_assert(ptr == data + 4);
+	boa_assert(dst.end_pos == 4);
+	boa_assert(!memcmp((char*)dst.data, "ABCD", 5));
+
+	ptr = data;
+	res = boa_convert_utf16_to_utf8(boa_clear(&dst), &ptr, NULL);
+
+	boa_assert(res != 0);
+	boa_assert(ptr == data + 4);
+	boa_assert(dst.end_pos == 4);
+	boa_assert(!memcmp((char*)dst.data, "ABCD", 5));
 }
 
 BOA_TEST(utf16to8_truncate_zero, "Implicit terminating zero not fitting counts as truncation")
@@ -314,6 +337,31 @@ BOA_TEST(utf16to8_truncate_zero, "Implicit terminating zero not fitting counts a
 	boa_assert(ptr == data + 2);
 	boa_assert(dst.end_pos == 2);
 	boa_assert(!memcmp((char*)dst.data, "AB", 2));
+}
+
+BOA_TEST(utf16to8_realloc_zero, "Should reallocate storage for missing null byte")
+{
+	uint16_t data[] = { (uint16_t)'A', (uint16_t)'B', 0 };
+	const uint16_t *ptr = data;
+	char result[2];
+	boa_buf dst = boa_array_buf(result);
+	int res;
+
+	ptr = data;
+	res = boa_convert_utf16_to_utf8(boa_clear(&dst), &ptr, boa_arrayend(data) - 1);
+
+	boa_assert(res != 0);
+	boa_assert(ptr == data + 2);
+	boa_assert(dst.end_pos == 2);
+	boa_assert(!memcmp((char*)dst.data, "AB", 3));
+
+	ptr = data;
+	res = boa_convert_utf16_to_utf8(boa_clear(&dst), &ptr, NULL);
+
+	boa_assert(res != 0);
+	boa_assert(ptr == data + 2);
+	boa_assert(dst.end_pos == 2);
+	boa_assert(!memcmp((char*)dst.data, "AB", 3));
 
 	boa_reset(&dst);
 }
