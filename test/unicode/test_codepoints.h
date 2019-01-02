@@ -13,6 +13,7 @@ typedef struct test_codepoint {
 	unsigned utf16_len;
 } test_codepoint;
 
+// Generated using `misc/test_codepoints_gen.py`
 static const test_codepoint test_codepoints[] = {
 	{ 0x000001, { 0x01,0x00,0x00,0x00 }, { 0x0001,0x0000 }, 1, 1 },
 	{ 0x000002, { 0x02,0x00,0x00,0x00 }, { 0x0002,0x0000 }, 1, 1 },
