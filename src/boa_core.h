@@ -422,6 +422,7 @@ void *boa_buf_insert(boa_buf *buf, uint32_t pos, uint32_t size);
 #define boa_reserve_cap(type, buf) (type*)boa_buf_reserve_cap((buf), sizeof(type))
 #define boa_bump(type, buf) boa_buf_bump((buf), sizeof(type))
 #define boa_push(type, buf) (type*)boa_buf_push((buf), sizeof(type))
+#define boa_push_data(buf, data) boa_buf_push_data((buf), (data), sizeof(*(data)))
 #define boa_insert(type, buf, pos) (type*)boa_buf_insert((buf), (pos) * sizeof(type), sizeof(type))
 #define boa_pop(type, buf) (*(type*)boa_buf_pop((buf), sizeof(type)))
 #define boa_get(type, buf, pos) (*(type*)boa_buf_get((buf), (pos) * sizeof(type), sizeof(type)))
@@ -430,6 +431,7 @@ void *boa_buf_insert(boa_buf *buf, uint32_t pos, uint32_t size);
 #define boa_reserve_cap_n(type, buf, n) (type*)boa_buf_reserve_cap((buf), (n) * sizeof(type))
 #define boa_bump_n(type, buf, n) boa_buf_bump((buf), (n) * sizeof(type))
 #define boa_push_n(type, buf, n) (type*)boa_buf_push((buf), (n) * sizeof(type))
+#define boa_push_data_n(buf, data, n) boa_buf_push_data((buf), (data), (n) * sizeof(*(data)))
 #define boa_insert_n(type, buf, pos, n) (type*)boa_buf_insert((buf), (pos) * sizeof(type), (n) * sizeof(type))
 #define boa_pop_n(type, buf, n) (type*)boa_buf_pop((buf), (n) * sizeof(type))
 #define boa_get_n(type, buf, pos, n) ((type*)boa_buf_get((buf), (pos) * sizeof(type), (n) * sizeof(type)))
@@ -439,6 +441,7 @@ void *boa_buf_insert(boa_buf *buf, uint32_t pos, uint32_t size);
 
 #define boa_push_val(type, buf, val) (*(type*)boa_check_ptr(boa_push(type, buf)) = (val))
 #define boa_insert_val(type, buf, pos, val) (*(type*)boa_check_ptr(boa_insert(type, buf, pos)) = (val))
+
 
 #define boa_remove(type, buf, pos) boa_buf_remove((buf), (pos) * sizeof(type), sizeof(type))
 #define boa_erase(type, buf, pos) boa_buf_erase((buf), (pos) * sizeof(type), sizeof(type))
