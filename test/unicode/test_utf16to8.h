@@ -290,3 +290,30 @@ BOA_TEST(utf16to8_truncate, "Converting should handle truncated output")
 
 	boa_reset(&dst);
 }
+
+BOA_TEST(utf16to8_truncate_zero, "Implicit terminating zero not fitting counts as truncation")
+{
+	uint16_t data[] = { (uint16_t)'A', (uint16_t)'B', 0 };
+	const uint16_t *ptr = data;
+	char result[2];
+	boa_buf dst = boa_array_view(result);
+	int res;
+
+	ptr = data;
+	res = boa_convert_utf16_to_utf8(boa_clear(&dst), &ptr, boa_arrayend(data) - 1);
+
+	boa_assert(res == 0);
+	boa_assert(ptr == data + 2);
+	boa_assert(dst.end_pos == 2);
+	boa_assert(!memcmp((char*)dst.data, "AB", 2));
+
+	ptr = data;
+	res = boa_convert_utf16_to_utf8(boa_clear(&dst), &ptr, NULL);
+
+	boa_assert(res == 0);
+	boa_assert(ptr == data + 2);
+	boa_assert(dst.end_pos == 2);
+	boa_assert(!memcmp((char*)dst.data, "AB", 2));
+
+	boa_reset(&dst);
+}
