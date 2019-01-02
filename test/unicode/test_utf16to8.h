@@ -12,7 +12,7 @@ BOA_TEST(utf16to8_ascii, "Converting UTF-16 to UTF-8 ASCII")
 	int res;
 
 	ptr = data;
-	res = boa_convert_utf16_to_utf8(&dst, &ptr, data + boa_arraycount(data) - 1);
+	res = boa_convert_utf16_to_utf8(&dst, &ptr, boa_arrayend(data) - 1);
 
 	boa_assert(res != 0);
 	boa_assert(dst.end_pos == 3);
@@ -37,7 +37,7 @@ BOA_TEST(utf16to8_bmp, "Convert a basic multilingual plane text")
 	int res;
 
 	ptr = data;
-	res = boa_convert_utf16_to_utf8(&dst, &ptr, data + boa_arraycount(data) - 1);
+	res = boa_convert_utf16_to_utf8(&dst, &ptr, boa_arrayend(data) - 1);
 
 	boa_assert(res != 0);
 	boa_assert(dst.end_pos == 17);
@@ -64,7 +64,7 @@ BOA_TEST(utf16to8_emoji, "Convert a few emojis")
 	int res;
 
 	ptr = data;
-	res = boa_convert_utf16_to_utf8(&dst, &ptr, data + boa_arraycount(data) - 1);
+	res = boa_convert_utf16_to_utf8(&dst, &ptr, boa_arrayend(data) - 1);
 
 	boa_assert(res != 0);
 	boa_assert(dst.end_pos == 8);
@@ -89,7 +89,7 @@ BOA_TEST(utf16to8_nulls, "Should be able to encode multiple NULL characters")
 	int res;
 
 	ptr = data;
-	res = boa_convert_utf16_to_utf8(&dst, &ptr, data + boa_arraycount(data));
+	res = boa_convert_utf16_to_utf8(&dst, &ptr, boa_arrayend(data));
 
 	boa_assert(res != 0);
 	boa_assert(dst.end_pos == 4);
@@ -172,4 +172,121 @@ BOA_TEST(utf16to8_test_codepoints_concat, "Should be able to convert test codepo
 	boa_reset(&src);
 	boa_reset(&target);
 	boa_reset(&buf);
+}
+
+BOA_TEST(utf16to8_surrogate_end, "Unpaired surrogate due to end")
+{
+	uint16_t data[] = { (uint16_t)'A', 0xD83D };
+	const uint16_t *ptr = data;
+	boa_buf dst = { 0 };
+	int res;
+
+	ptr = data;
+	res = boa_convert_utf16_to_utf8(&dst, &ptr, boa_arrayend(data));
+
+	boa_assert(res == 0);
+	boa_assert(ptr == data + 1);
+	boa_assert(dst.end_pos == 1);
+	boa_assert(!strcmp((char*)dst.data, "A"));
+
+	boa_reset(&dst);
+}
+
+BOA_TEST(utf16to8_surrogate_doublehi, "Double high surrogate")
+{
+	uint16_t data[] = { (uint16_t)'A', 0xD83D, 0xD83D };
+	const uint16_t *ptr = data;
+	boa_buf dst = { 0 };
+	int res;
+
+	ptr = data;
+	res = boa_convert_utf16_to_utf8(&dst, &ptr, boa_arrayend(data));
+
+	boa_assert(res == 0);
+	boa_assert(ptr == data + 1);
+	boa_assert(dst.end_pos == 1);
+	boa_assert(!strcmp((char*)dst.data, "A"));
+
+	boa_reset(&dst);
+}
+
+BOA_TEST(utf16to8_surrogate_wrongorder, "Surrogates in wrong order")
+{
+	uint16_t data[] = { (uint16_t)'A', 0xDC4C, 0xD83D };
+	const uint16_t *ptr = data;
+	boa_buf dst = { 0 };
+	int res;
+
+	ptr = data;
+	res = boa_convert_utf16_to_utf8(&dst, &ptr, boa_arrayend(data));
+
+	boa_assert(res == 0);
+	boa_assert(ptr == data + 1);
+	boa_assert(dst.end_pos == 1);
+	boa_assert(!strcmp((char*)dst.data, "A"));
+
+	boa_reset(&dst);
+}
+
+BOA_TEST(utf16to8_surrogate_singleghi, "Single high surrogate")
+{
+	uint16_t data[] = { (uint16_t)'A', 0xD83D, (uint16_t)'B' };
+	const uint16_t *ptr = data;
+	boa_buf dst = { 0 };
+	int res;
+
+	ptr = data;
+	res = boa_convert_utf16_to_utf8(&dst, &ptr, boa_arrayend(data));
+
+	boa_assert(res == 0);
+	boa_assert(ptr == data + 1);
+	boa_assert(dst.end_pos == 1);
+	boa_assert(!strcmp((char*)dst.data, "A"));
+
+	boa_reset(&dst);
+}
+
+BOA_TEST(utf16to8_surrogate_singlelo, "Single low surrogate")
+{
+	uint16_t data[] = { (uint16_t)'A', 0xDC4C, (uint16_t)'B' };
+	const uint16_t *ptr = data;
+	boa_buf dst = { 0 };
+	int res;
+
+	ptr = data;
+	res = boa_convert_utf16_to_utf8(&dst, &ptr, boa_arrayend(data));
+
+	boa_assert(res == 0);
+	boa_assert(ptr == data + 1);
+	boa_assert(dst.end_pos == 1);
+	boa_assert(!strcmp((char*)dst.data, "A"));
+
+	boa_reset(&dst);
+}
+
+BOA_TEST(utf16to8_truncate, "Converting should handle truncated output")
+{
+	uint16_t data[] = { (uint16_t)'A', (uint16_t)'B', (uint16_t)'C', (uint16_t)'D', 0 };
+	const uint16_t *ptr = data;
+	char result[2];
+	boa_buf dst = boa_array_view(result);
+	int res;
+
+	ptr = data;
+	res = boa_convert_utf16_to_utf8(boa_clear(&dst), &ptr, boa_arrayend(data) - 1);
+
+	boa_assert(res == 0);
+	boa_assert(ptr == data + 2);
+	boa_assert(dst.end_pos == 2);
+	boa_assert(!memcmp((char*)dst.data, "AB", 2));
+
+	ptr = data;
+	res = boa_convert_utf16_to_utf8(boa_clear(&dst), &ptr, NULL);
+
+	boa_assert(res == 0);
+	boa_assert(ptr == data + 2);
+	boa_assert(dst.end_pos == 2);
+	boa_assert(!memcmp((char*)dst.data, "AB", 2));
+
+	boa_reset(&dst);
 }
