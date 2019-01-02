@@ -426,7 +426,7 @@ struct map: Hasher {
 	}
 
 	iterator begin() { return boa_map_begin(this); }
-	iterator end() { return map_iterator<T>(); }
+	iterator end() { return iterator(); }
 	iterator iterate_from(key_val *entry) { return boa_map_iterate_from(this, entry); }
 };
 

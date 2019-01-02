@@ -16,7 +16,6 @@
 	#define NOMINMAX
 	#include <Windows.h>
 #elif BOA_LINUX
-	#include <time.h>
 	#include <sys/time.h>
 #endif
 
