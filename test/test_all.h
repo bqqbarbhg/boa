@@ -12,6 +12,8 @@
 
 #include "os/test_os.h"
 
+#include "unicode/test_utf16to8.h"
+
 #ifdef __cplusplus
 #include "core/test_core_cpp.h"
 

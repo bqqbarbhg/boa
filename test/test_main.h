@@ -2,6 +2,7 @@
 #include <boa_test_impl.h>
 #include <boa_core_impl.h>
 #include <boa_os_impl.h>
+#include <boa_unicode_impl.h>
 
 #include <stdio.h>
 #include <string.h>

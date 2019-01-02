@@ -301,6 +301,15 @@ boa_buf_reserve(boa_buf *buf, uint32_t size)
 	return boa__buf_grow(buf, req_cap);
 }
 
+boa_forceinline void *
+boa_buf_reserve_cap(boa_buf *buf, uint32_t size)
+{
+	extern void *boa__buf_grow(boa_buf *buf, uint32_t req_cap);
+	uint32_t cap = buf->cap_pos;
+	uint32_t req_cap = cap + size;
+	return boa__buf_grow(buf, req_cap);
+}
+
 boa_forceinline void
 boa_buf_bump(boa_buf *buf, uint32_t size)
 {
@@ -410,6 +419,7 @@ void *boa_buf_insert(boa_buf *buf, uint32_t pos, uint32_t size);
 #define boa_cap(type, buf) ((type*)((char*)(buf)->data + (buf)->cap_pos))
 #define boa_count(type, buf) ((buf)->end_pos / sizeof(type))
 #define boa_reserve(type, buf) (type*)boa_buf_reserve((buf), sizeof(type))
+#define boa_reserve_cap(type, buf) (type*)boa_buf_reserve_cap((buf), sizeof(type))
 #define boa_bump(type, buf) boa_buf_bump((buf), sizeof(type))
 #define boa_push(type, buf) (type*)boa_buf_push((buf), sizeof(type))
 #define boa_insert(type, buf, pos) (type*)boa_buf_insert((buf), (pos) * sizeof(type), sizeof(type))
@@ -417,6 +427,7 @@ void *boa_buf_insert(boa_buf *buf, uint32_t pos, uint32_t size);
 #define boa_get(type, buf, pos) (*(type*)boa_buf_get((buf), (pos) * sizeof(type), sizeof(type)))
 
 #define boa_reserve_n(type, buf, n) (type*)boa_buf_reserve((buf), (n) * sizeof(type))
+#define boa_reserve_cap_n(type, buf, n) (type*)boa_buf_reserve_cap((buf), (n) * sizeof(type))
 #define boa_bump_n(type, buf, n) boa_buf_bump((buf), (n) * sizeof(type))
 #define boa_push_n(type, buf, n) (type*)boa_buf_push((buf), (n) * sizeof(type))
 #define boa_insert_n(type, buf, pos, n) (type*)boa_buf_insert((buf), (pos) * sizeof(type), (n) * sizeof(type))
