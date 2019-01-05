@@ -10,6 +10,8 @@
 #include "core/test_map.h"
 #include "core/test_pqueue.h"
 
+#include "core/test_map_impl.h"
+
 #include "os/test_os.h"
 
 #include "unicode/test_utf16to8.h"
