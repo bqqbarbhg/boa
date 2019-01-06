@@ -10,6 +10,10 @@
 #include <stdarg.h>
 #include <stdio.h>
 
+// -- boa_error
+
+const boa_error boa_err_no_space = { "Allocator is out of space" };
+
 // -- Utility
 
 uint32_t boa_round_pow2_up(uint32_t value)

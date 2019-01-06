@@ -31,6 +31,10 @@
 		boa_buf fmtbuf = boa_empty_buf_ator(boa_test_original_ator()); \
 		boa__test_do_fail(__FILE__, __LINE__, #cond, boa_format(&fmtbuf, __VA_ARGS__)); \
 	} } while (0)
+#define boa_assert_ok(cond) do { boa_result boa__assert_res = (cond); if (boa__assert_res != boa_ok) { \
+		boa_buf fmtbuf = boa_empty_buf_ator(boa_test_original_ator()); \
+		boa__test_do_fail(__FILE__, __LINE__, #cond, boa_format(&fmtbuf, "Result was not OK: %s", boa__assert_res->description)); \
+	} } while (0)
 
 #define boa_expect_assert(expr) do { \
 	extern jmp_buf *boa__test_expect_assert_jmp; \

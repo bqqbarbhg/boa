@@ -156,6 +156,18 @@ boa_forceinline void *boa_check_ptr(const void *ptr)
 	return (void*)ptr;
 }
 
+// -- boa_error
+
+typedef struct boa_error {
+	const char *description;
+} boa_error;
+
+extern const boa_error boa_err_no_space; // Allocator is out of space
+
+typedef const boa_error *boa_result;
+
+#define boa_ok ((const boa_error*)0)
+
 // -- Utility
 
 boa_forceinline uint32_t boa_align_up(uint32_t value, uint32_t align)

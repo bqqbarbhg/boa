@@ -10,12 +10,12 @@ BOA_TEST(utf8to16_ascii, "Converting UTF-8 to UTF-16 ASCII")
 	char data[] = { 'A', 'B', 'C', 0 };
 	const char *ptr = data;
 	boa_buf dst = { 0 };
-	int res;
+	boa_result res;
 
 	ptr = data;
 	res = boa_convert_utf8_to_utf16(&dst, &ptr, boa_arrayend(data) - 1);
 
-	boa_assert(res != 0);
+	boa_assert_ok(res);
 	boa_assert(dst.end_pos == 6);
 	boa_assert(!memcmp(dst.data, result, sizeof(result)));
 
@@ -23,7 +23,7 @@ BOA_TEST(utf8to16_ascii, "Converting UTF-8 to UTF-16 ASCII")
 	ptr = data;
 	res = boa_convert_utf8_to_utf16(&dst, &ptr, NULL);
 
-	boa_assert(res != 0);
+	boa_assert_ok(res);
 	boa_assert(dst.end_pos == 6);
 	boa_assert(!memcmp(dst.data, result, sizeof(result)));
 
@@ -36,12 +36,12 @@ BOA_TEST(utf8to16_bmp, "Convert a basic multilingual plane text")
 	char data[] = "\xC3\xA4\xE6\x97\xA5\xE6\x9C\xAC\xE3\x81\xAB\xE3\x81\xBB\xE3\x82\x93";
 	const char *ptr = data;
 	boa_buf dst = { 0 };
-	int res;
+	boa_result res;
 
 	ptr = data;
 	res = boa_convert_utf8_to_utf16(&dst, &ptr, boa_arrayend(data) - 1);
 
-	boa_assert(res != 0);
+	boa_assert_ok(res);
 	boa_assert(dst.end_pos == 12);
 	boa_assert(!memcmp(dst.data, result, sizeof(result)));
 
@@ -49,7 +49,7 @@ BOA_TEST(utf8to16_bmp, "Convert a basic multilingual plane text")
 	ptr = data;
 	res = boa_convert_utf8_to_utf16(&dst, &ptr, NULL);
 
-	boa_assert(res != 0);
+	boa_assert_ok(res);
 	boa_assert(dst.end_pos == 12);
 	boa_assert(!memcmp(dst.data, result, sizeof(result)));
 
@@ -62,12 +62,12 @@ BOA_TEST(utf8to16_emoji, "Convert a few emojis")
 	char data[] = "\xF0\x9F\x91\x8C\xF0\x9F\x91\x80";
 	const char *ptr = data;
 	boa_buf dst = { 0 };
-	int res;
+	boa_result res;
 
 	ptr = data;
 	res = boa_convert_utf8_to_utf16(&dst, &ptr, boa_arrayend(data) - 1);
 
-	boa_assert(res != 0);
+	boa_assert_ok(res);
 	boa_assert(dst.end_pos == 8);
 	boa_assert(!memcmp(dst.data, result, sizeof(result)));
 
@@ -75,7 +75,7 @@ BOA_TEST(utf8to16_emoji, "Convert a few emojis")
 	ptr = data;
 	res = boa_convert_utf8_to_utf16(&dst, &ptr, NULL);
 
-	boa_assert(res != 0);
+	boa_assert_ok(res);
 	boa_assert(dst.end_pos == 8);
 	boa_assert(!memcmp(dst.data, result, sizeof(result)));
 
@@ -88,12 +88,12 @@ BOA_TEST(utf8to16_nulls, "Should be able to encode multiple NULL characters")
 	char data[] = "\0\0\0A";
 	const char *ptr = data;
 	boa_buf dst = { 0 };
-	int res;
+	boa_result res;
 
 	ptr = data;
 	res = boa_convert_utf8_to_utf16(&dst, &ptr, boa_arrayend(data) - 1);
 
-	boa_assert(res != 0);
+	boa_assert_ok(res);
 	boa_assert(dst.end_pos == 8);
 	boa_assert(!memcmp((char*)dst.data, result, sizeof(result)));
 
@@ -110,7 +110,7 @@ BOA_TEST(utf8to16_test_codepoints, "Should be able to convert test codepoint set
 		boa_test_hint_u32(i);
 
 		const char *ptr;
-		int res;
+		boa_result res;
 		char local[5];
 		memcpy(local, point->utf8, point->utf8_len * sizeof(char));
 		local[point->utf8_len] = 0;
@@ -119,7 +119,7 @@ BOA_TEST(utf8to16_test_codepoints, "Should be able to convert test codepoint set
 		ptr = (char*)point->utf8;
 		res = boa_convert_utf8_to_utf16(&buf, &ptr, ptr + point->utf8_len);
 
-		boa_assert(res != 0);
+		boa_assert_ok(res);
 		boa_assert(buf.end_pos == point->utf16_len * sizeof(uint16_t));
 		boa_assert(ptr == (char*)point->utf8 + point->utf8_len);
 		boa_assert(!memcmp(buf.data, point->utf16, point->utf16_len));
@@ -128,7 +128,7 @@ BOA_TEST(utf8to16_test_codepoints, "Should be able to convert test codepoint set
 		ptr = local;
 		res = boa_convert_utf8_to_utf16(&buf, &ptr, NULL);
 
-		boa_assert(res != 0);
+		boa_assert_ok(res);
 		boa_assert(buf.end_pos == point->utf16_len * sizeof(uint16_t));
 		boa_assert(ptr == local + point->utf8_len);
 		boa_assert(!memcmp(buf.data, point->utf16, point->utf16_len));
@@ -143,21 +143,21 @@ BOA_TEST(utf8to16_test_codepoints_concat, "Should be able to convert test codepo
 	boa_buf target = boa_empty_buf();
 	boa_buf buf = boa_empty_buf();
 	const char *ptr;
-	int res;
+	boa_result res;
 
 	uint32_t count = boa_arraycount(test_codepoints);
 	for (uint32_t i = 0; i < count; i++) {
 		const test_codepoint *point = &test_codepoints[i];
-		res = boa_push_data_n(&src, point->utf8, point->utf8_len);
-		boa_assert(res != 0);
-		res = boa_push_data_n(&target, point->utf16, point->utf16_len);
-		boa_assert(res != 0);
+		res = boa_push_data_n(&src, point->utf8, point->utf8_len) ? boa_ok : &boa_err_no_space;
+		boa_assert_ok(res);
+		res = boa_push_data_n(&target, point->utf16, point->utf16_len) ? boa_ok : &boa_err_no_space;
+		boa_assert_ok(res);
 	}
 
 	ptr = boa_begin(char, &src);
 	res = boa_convert_utf8_to_utf16(boa_clear(&buf), &ptr, boa_end(char, &src));
 
-	boa_assert(res != 0);
+	boa_assert_ok(res);
 	boa_assert(buf.end_pos == target.end_pos);
 	boa_assert(ptr == boa_end(char, &src));
 	boa_assert(!memcmp(buf.data, target.data, buf.end_pos));
@@ -166,7 +166,7 @@ BOA_TEST(utf8to16_test_codepoints_concat, "Should be able to convert test codepo
 	ptr = boa_begin(char, &src);
 	res = boa_convert_utf8_to_utf16(boa_clear(&buf), &ptr, NULL);
 
-	boa_assert(res != 0);
+	boa_assert_ok(res);
 	boa_assert(buf.end_pos == target.end_pos);
 	boa_assert(ptr == boa_end(char, &src) - 1);
 	boa_assert(!memcmp(buf.data, target.data, buf.end_pos));
@@ -182,12 +182,12 @@ BOA_TEST(utf8to16_unexpected_continuation, "Unpaired surrogate due to end")
 	char data[] = { 'A', (char)0xA4, 'A' };
 	const char *ptr = data;
 	boa_buf dst = { 0 };
-	int res;
+	boa_result res;
 
 	ptr = data;
 	res = boa_convert_utf8_to_utf16(&dst, &ptr, boa_arrayend(data));
 
-	boa_assert(res == 0);
+	boa_assert(res != boa_ok);
 	boa_assert(ptr == data + 1);
 	boa_assert(dst.end_pos == 2);
 	boa_assert(!memcmp(dst.data, result, sizeof(result)));
