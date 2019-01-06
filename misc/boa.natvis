@@ -20,7 +20,6 @@
       <Item Name="capacity">capacity</Item>
 
       <CustomListItems MaxItemsPerView="4096">
-        <Variable Name="ix" InitialValue="0"/>
         <Variable Name="block" InitialValue="0"/>
         <Variable Name="offset" InitialValue="0"/>
         <Variable Name="block_count" InitialValue="impl.num_used_blocks"/>
@@ -50,7 +49,6 @@
       <Item Name="capacity">capacity</Item>
 
       <CustomListItems MaxItemsPerView="4096">
-        <Variable Name="ix" InitialValue="0"/>
         <Variable Name="block" InitialValue="0"/>
         <Variable Name="offset" InitialValue="0"/>
         <Variable Name="block_count" InitialValue="impl.num_used_blocks"/>
