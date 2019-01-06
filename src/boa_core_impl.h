@@ -701,7 +701,7 @@ boa_noinline void *boa_ptr_map_find(boa_map *map, const void *key)
 
 static int boa__u32_map_cmp(const void *a, const void *b, void *user)
 {
-	return *(const void**)a == *(const void**)b;
+	return *(const uint32_t*)a == *(const uint32_t*)b;
 }
 
 boa_noinline boa_map_insert_result boa_u32_map_insert(boa_map *map, uint32_t key)

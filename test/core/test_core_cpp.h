@@ -103,6 +103,32 @@ BOA_TEST(cpp_format_buf, "boa::format() simple overload")
 	boa_assert(strcmp(str, "Hello World") == 0);
 }
 
+BOA_TEST(cpp_set_u32, "C++ U32 set")
+{
+	boa::u32_set<uint32_t> set;
+	set.insert(10);
+	set.insert(20);
+	set.insert(30);
+
+	boa_assert(set.find(10) && *set.find(10) == 10);
+	boa_assert(set.find(20) && *set.find(20) == 20);
+	boa_assert(set.find(30) && *set.find(30) == 30);
+	boa_assert(set.find(40) == nullptr);
+}
+
+BOA_TEST(cpp_map_u32, "C++ U32 map")
+{
+	boa::u32_map<uint32_t, uint32_t> map;
+	map.insert(1, 10);
+	map.insert(2, 20);
+	map.insert(3, 30);
+
+	boa_assert(map.find(1) && map.find(1)->val == 10);
+	boa_assert(map.find(2) && map.find(2)->val == 20);
+	boa_assert(map.find(3) && map.find(3)->val == 30);
+	boa_assert(map.find(4) == nullptr);
+}
+
 BOA_TEST(cpp_pqueue, "C++ priority queue")
 {
 	boa::pqueue<int> pq;
