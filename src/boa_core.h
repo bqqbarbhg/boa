@@ -622,7 +622,7 @@ boa_map_remove_iter(boa_map *map, void *entry)
 }
 
 // Convert an entry pointer to an iterator.
-boa_map_iterator boa_map_iterate_from(const boa_map *map, void *entry);
+boa_map_iterator boa_map_iterate_from(const boa_map *map, const void *entry);
 
 // Get the iterator to the first entry in the map.
 boa_forceinline boa_map_iterator boa_map_begin(const boa_map *map) {
