@@ -20,6 +20,8 @@
 #ifdef __cplusplus
 #include "core/test_core_cpp.h"
 
+#include "unicode/test_unicode_cpp.h"
+
 #include "example/test_astar_cpp.h"
 #endif
 

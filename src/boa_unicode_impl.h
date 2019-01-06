@@ -280,8 +280,8 @@ boa_result boa_convert_utf8_to_utf16_replace(boa_buf *buf, const char **ptr, con
 	return res;
 }
 
-extern uint16_t boa_utf16_replacement_character[1] = { 0xFFFD };
-extern char boa_utf8_replacement_character[3] = { (char)0xEF, (char)0xBF, (char)0xBD };
+const uint16_t boa_utf16_replacement_character[1] = { 0xFFFD };
+const char boa_utf8_replacement_character[3] = { (char)0xEF, (char)0xBF, (char)0xBD };
 
 #endif
 

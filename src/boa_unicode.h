@@ -13,8 +13,8 @@ boa_result boa_convert_utf8_to_utf16(boa_buf *buf, const char **ptr, const char 
 boa_result boa_convert_utf16_to_utf8_replace(boa_buf *buf, const uint16_t **ptr, const uint16_t *end, const char *replace, uint32_t replace_len);
 boa_result boa_convert_utf8_to_utf16_replace(boa_buf *buf, const char **ptr, const char *end, const uint16_t *replace, uint32_t replace_len);
 
-extern uint16_t boa_utf16_replacement_character[1];
-extern char boa_utf8_replacement_character[3];
+extern const uint16_t boa_utf16_replacement_character[1];
+extern const char boa_utf8_replacement_character[3];
 
 boa_forceinline boa_result boa_convert_utf16_to_utf8_replace_default(boa_buf *buf, const uint16_t **ptr, const uint16_t *end) {
 	return boa_convert_utf16_to_utf8_replace(buf, ptr, end, boa_utf8_replacement_character, 3);

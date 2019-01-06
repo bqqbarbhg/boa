@@ -13,6 +13,14 @@ extern boa_allocator boa__default_ator;
 
 namespace boa {
 
+// -- boa_result
+
+typedef boa_error error;
+typedef boa_result result;
+
+constexpr result ok = boa_ok;
+constexpr result err_no_space = &boa_err_no_space;
+
 // -- boa_pod
 
 template <typename T>

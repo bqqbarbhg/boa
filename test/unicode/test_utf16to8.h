@@ -184,7 +184,7 @@ BOA_TEST(utf16to8_surrogate_end, "Unpaired surrogate due to end")
 	ptr = data;
 	res = boa_convert_utf16_to_utf8(&dst, &ptr, boa_arrayend(data));
 
-	boa_assert(res != boa_ok);
+	boa_assert(res == &boa_err_unicode_conversion);
 	boa_assert(ptr == data + 1);
 	boa_assert(dst.end_pos == 1);
 	boa_assert(!strcmp((char*)dst.data, "A"));
@@ -202,7 +202,7 @@ BOA_TEST(utf16to8_surrogate_doublehi, "Double high surrogate")
 	ptr = data;
 	res = boa_convert_utf16_to_utf8(&dst, &ptr, boa_arrayend(data));
 
-	boa_assert(res != boa_ok);
+	boa_assert(res == &boa_err_unicode_conversion);
 	boa_assert(ptr == data + 1);
 	boa_assert(dst.end_pos == 1);
 	boa_assert(!strcmp((char*)dst.data, "A"));
@@ -220,7 +220,7 @@ BOA_TEST(utf16to8_surrogate_wrongorder, "Surrogates in wrong order")
 	ptr = data;
 	res = boa_convert_utf16_to_utf8(&dst, &ptr, boa_arrayend(data));
 
-	boa_assert(res != boa_ok);
+	boa_assert(res == &boa_err_unicode_conversion);
 	boa_assert(ptr == data + 1);
 	boa_assert(dst.end_pos == 1);
 	boa_assert(!strcmp((char*)dst.data, "A"));
@@ -238,7 +238,7 @@ BOA_TEST(utf16to8_surrogate_singleghi, "Single high surrogate")
 	ptr = data;
 	res = boa_convert_utf16_to_utf8(&dst, &ptr, boa_arrayend(data));
 
-	boa_assert(res != boa_ok);
+	boa_assert(res == &boa_err_unicode_conversion);
 	boa_assert(ptr == data + 1);
 	boa_assert(dst.end_pos == 1);
 	boa_assert(!strcmp((char*)dst.data, "A"));
@@ -256,7 +256,7 @@ BOA_TEST(utf16to8_surrogate_singlelo, "Single low surrogate")
 	ptr = data;
 	res = boa_convert_utf16_to_utf8(&dst, &ptr, boa_arrayend(data));
 
-	boa_assert(res != boa_ok);
+	boa_assert(res == &boa_err_unicode_conversion);
 	boa_assert(ptr == data + 1);
 	boa_assert(dst.end_pos == 1);
 	boa_assert(!strcmp((char*)dst.data, "A"));
@@ -275,7 +275,7 @@ BOA_TEST(utf16to8_truncate, "Converting should handle truncated output")
 	ptr = data;
 	res = boa_convert_utf16_to_utf8(boa_clear(&dst), &ptr, boa_arrayend(data) - 1);
 
-	boa_assert(res != boa_ok);
+	boa_assert(res == &boa_err_no_space);
 	boa_assert(ptr == data + 2);
 	boa_assert(dst.end_pos == 2);
 	boa_assert(!memcmp((char*)dst.data, "AB", 2));
@@ -283,7 +283,7 @@ BOA_TEST(utf16to8_truncate, "Converting should handle truncated output")
 	ptr = data;
 	res = boa_convert_utf16_to_utf8(boa_clear(&dst), &ptr, NULL);
 
-	boa_assert(res != boa_ok);
+	boa_assert(res == &boa_err_no_space);
 	boa_assert(ptr == data + 2);
 	boa_assert(dst.end_pos == 2);
 	boa_assert(!memcmp((char*)dst.data, "AB", 2));
@@ -325,7 +325,7 @@ BOA_TEST(utf16to8_truncate_zero, "Implicit terminating zero not fitting counts a
 	ptr = data;
 	res = boa_convert_utf16_to_utf8(boa_clear(&dst), &ptr, boa_arrayend(data) - 1);
 
-	boa_assert(res != boa_ok);
+	boa_assert(res == &boa_err_no_space);
 	boa_assert(ptr == data + 2);
 	boa_assert(dst.end_pos == 2);
 	boa_assert(!memcmp((char*)dst.data, "AB", 2));
@@ -333,7 +333,7 @@ BOA_TEST(utf16to8_truncate_zero, "Implicit terminating zero not fitting counts a
 	ptr = data;
 	res = boa_convert_utf16_to_utf8(boa_clear(&dst), &ptr, NULL);
 
-	boa_assert(res != boa_ok);
+	boa_assert(res == &boa_err_no_space);
 	boa_assert(ptr == data + 2);
 	boa_assert(dst.end_pos == 2);
 	boa_assert(!memcmp((char*)dst.data, "AB", 2));
@@ -404,7 +404,7 @@ BOA_TEST(utf16to8_replace_truncate_replacement, "Convert and replace truncating 
 	ptr = data;
 	res = boa_convert_utf16_to_utf8_replace(boa_clear(&dst), &ptr, boa_arrayend(data) - 1, "X", 1);
 
-	boa_assert(res != boa_ok);
+	boa_assert(res == &boa_err_no_space);
 	boa_assert(ptr == data + 3);
 	boa_assert(dst.end_pos == 3);
 	boa_assert(!memcmp((char*)dst.data, "AXB", 3));
@@ -412,7 +412,7 @@ BOA_TEST(utf16to8_replace_truncate_replacement, "Convert and replace truncating 
 	ptr = data;
 	res = boa_convert_utf16_to_utf8_replace(boa_clear(&dst), &ptr, NULL, "X", 1);
 
-	boa_assert(res != boa_ok);
+	boa_assert(res == &boa_err_no_space);
 	boa_assert(ptr == data + 3);
 	boa_assert(dst.end_pos == 3);
 	boa_assert(!memcmp((char*)dst.data, "AXB", 3));
@@ -431,7 +431,7 @@ BOA_TEST(utf16to8_replace_truncate_convert, "Convert and replace truncating a co
 	ptr = data;
 	res = boa_convert_utf16_to_utf8_replace(boa_clear(&dst), &ptr, boa_arrayend(data) - 1, "X", 1);
 
-	boa_assert(res != boa_ok);
+	boa_assert(res == &boa_err_no_space);
 	boa_assert(ptr == data + 2);
 	boa_assert(dst.end_pos == 2);
 	boa_assert(!memcmp((char*)dst.data, "AX", 2));
@@ -439,7 +439,7 @@ BOA_TEST(utf16to8_replace_truncate_convert, "Convert and replace truncating a co
 	ptr = data;
 	res = boa_convert_utf16_to_utf8_replace(boa_clear(&dst), &ptr, NULL, "X", 1);
 
-	boa_assert(res != boa_ok);
+	boa_assert(res == &boa_err_no_space);
 	boa_assert(ptr == data + 2);
 	boa_assert(dst.end_pos == 2);
 	boa_assert(!memcmp((char*)dst.data, "AX", 2));
