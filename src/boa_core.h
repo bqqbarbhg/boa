@@ -552,9 +552,9 @@ typedef struct boa_map_iterator {
 } boa_map_iterator;
 
 uint32_t boa__map_find_fallback(boa_map *map, uint32_t block_ix);
-boa_map_iterator boa__map_find_block_start(boa_map *map, uint32_t block_ix);
+boa_map_iterator boa__map_find_block_start(const boa_map *map, uint32_t block_ix);
 void *boa__map_remove_non_iter(boa_map *map, void *value);
-boa_map_iterator boa__map_find_next(boa_map *map, void *value);
+boa_map_iterator boa__map_find_next(const boa_map *map, const void *value);
 
 #define boa__map_block_num_slots(map) ((map)->impl.block_num_entries << 1)
 
@@ -601,7 +601,7 @@ int boa_map_reserve(boa_map *map, uint32_t capacity);
 boa_noinline boa_map_insert_result boa_map_insert(boa_map *map, const void *key_ptr, uint32_t hash, boa_map_cmp_fn cmp, void *user);
 
 // Find a value from the map.
-boa_noinline void *boa_map_find(boa_map *map, const void *key_ptr, uint32_t hash, boa_map_cmp_fn cmp, void *user);
+boa_noinline void *boa_map_find(const boa_map *map, const void *key_ptr, uint32_t hash, boa_map_cmp_fn cmp, void *user);
 
 // Remove an entry from the map.
 boa_forceinline void boa_map_remove(boa_map *map, void *entry) {
@@ -622,15 +622,15 @@ boa_map_remove_iter(boa_map *map, void *entry)
 }
 
 // Convert an entry pointer to an iterator.
-boa_map_iterator boa_map_iterate_from(boa_map *map, void *entry);
+boa_map_iterator boa_map_iterate_from(const boa_map *map, void *entry);
 
 // Get the iterator to the first entry in the map.
-boa_forceinline boa_map_iterator boa_map_begin(boa_map *map) {
+boa_forceinline boa_map_iterator boa_map_begin(const boa_map *map) {
 	return boa__map_find_block_start(map, 0);
 }
 
 // Advance the iterator to the next entry.
-boa_forceinline void boa_map_advance(boa_map *map, boa_map_iterator *it)
+boa_forceinline void boa_map_advance(const boa_map *map, boa_map_iterator *it)
 {
 	boa_assert(it->entry != NULL);
 	void *next = (char*)it->entry + map->entry_size;
@@ -641,13 +641,13 @@ boa_forceinline void boa_map_advance(boa_map *map, boa_map_iterator *it)
 	}
 }
 
-boa_forceinline void *boa__map_begin_for(boa_map *map, void **impl_end) {
+boa_forceinline void *boa__map_begin_for(const boa_map *map, void **impl_end) {
 	boa_map_iterator it = boa__map_find_block_start(map, 0);
 	*impl_end = it.impl_block_end;
 	return it.entry;
 }
 
-boa_forceinline void *boa__map_advance_for_block(boa_map *map, void *entry, void **impl_end) {
+boa_forceinline void *boa__map_advance_for_block(const boa_map *map, void *entry, void **impl_end) {
 	boa_assert(entry != NULL);
 	boa_map_iterator it = boa__map_find_next(map, entry);
 	*impl_end = it.impl_block_end;
@@ -780,7 +780,7 @@ boa_map_insert_inline(boa_map *map, const void *key_ptr, uint32_t hash, boa_map_
 
 // Inline implementation of `boa_map_find()`, wrap in a specialized function for better map performance
 boa_forceinline void *
-boa_map_find_inline(boa_map *map, const void *key_ptr, uint32_t hash, boa_map_cmp_fn cmp, void *user)
+boa_map_find_inline(const boa_map *map, const void *key_ptr, uint32_t hash, boa_map_cmp_fn cmp, void *user)
 {
 	// Edge case: Rest of the boa_map struct can be invalid when empty
 	if (map->count == 0) return NULL;
@@ -833,15 +833,15 @@ boa_map_find_inline(boa_map *map, const void *key_ptr, uint32_t hash, boa_map_cm
 
 // Blit map: Bitwise hash and compare key
 boa_noinline boa_map_insert_result boa_blit_map_insert(boa_map *map, const void *key_ptr, uint32_t key_size);
-boa_noinline void *boa_blit_map_find(boa_map *map, const void *key_ptr, uint32_t key_size);
+boa_noinline void *boa_blit_map_find(const boa_map *map, const void *key_ptr, uint32_t key_size);
 
 // Pointer map
 boa_noinline boa_map_insert_result boa_ptr_map_insert(boa_map *map, const void *key);
-boa_noinline void *boa_ptr_map_find(boa_map *map, const void *key);
+boa_noinline void *boa_ptr_map_find(const boa_map *map, const void *key);
 
 // uint32_t map
 boa_noinline boa_map_insert_result boa_u32_map_insert(boa_map *map, uint32_t key);
-boa_noinline void *boa_u32_map_find(boa_map *map, uint32_t key);
+boa_noinline void *boa_u32_map_find(const boa_map *map, uint32_t key);
 
 // -- boa_heap
 

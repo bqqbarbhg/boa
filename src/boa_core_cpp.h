@@ -174,7 +174,7 @@ struct blit_hasher: boa_map {
 	boa_map_insert_result hasher_insert(const void *key) {
 		return boa_blit_map_insert(this, key, blit_key_size);
 	}
-	void *hasher_find(const void *key) {
+	void *hasher_find(const void *key) const {
 		return boa_blit_map_find(this, key, blit_key_size);
 	}
 };
@@ -189,7 +189,7 @@ struct ptr_hasher: boa_map {
 	boa_map_insert_result hasher_insert(const void *key) {
 		return boa_ptr_map_insert(this, *(const void**)key);
 	}
-	void *hasher_find(const void *key) {
+	void *hasher_find(const void *key) const {
 		return boa_ptr_map_find(this, *(const void**)key);
 	}
 };
@@ -204,7 +204,7 @@ struct u32_hasher: boa_map {
 	boa_map_insert_result hasher_insert(const void *key) {
 		return boa_u32_map_insert(this, *(const uint32_t*)key);
 	}
-	void *hasher_find(const void *key) {
+	void *hasher_find(const void *key) const {
 		return boa_u32_map_find(this, *(const uint32_t*)key);
 	}
 };
@@ -236,7 +236,7 @@ struct virtual_hasher: boa_map {
 		uint32_t hash = virtual_hash_fn(key, NULL);
 		return boa_map_insert(this, key, hash, virtual_cmp_fn, NULL);
 	}
-	void *hasher_find(const void *key) {
+	void *hasher_find(const void *key) const {
 		uint32_t hash = virtual_hash_fn(key, NULL);
 		return boa_map_find(this, key, hash, virtual_cmp_fn, NULL);
 	}
@@ -262,7 +262,7 @@ struct inline_hasher: boa_map {
 		uint32_t hash = inline_hash(key);
 		return boa_map_insert(this, key, hash, &inline_equal);
 	}
-	void *hasher_find(const void *key) {
+	void *hasher_find(const void *key) const {
 		uint32_t hash = inline_hash(key);
 		return boa_map_find(this, key, hash, &inline_equal);
 	}
@@ -291,16 +291,31 @@ struct insert_result {
 
 template <typename T>
 struct map_iterator: boa_map_iterator {
+	const boa_map *map;
+
+	map_iterator() {
+		entry = NULL;
+	}
+
+	map_iterator(const boa_map *map, const boa_map_iterator &it)
+		: boa_map_iterator(it), map(map) { }
 
 	map_iterator<T> &operator++() {
-		boa_map_advance(this);
+		boa_map_advance(map, this);
 		return *this;
 	}
 
 	map_iterator<T> operator++(int) {
 		map_iterator<T> res = *this;
-		boa_map_advance(this);
+		boa_map_advance(map, this);
 		return res;
+	}
+
+	bool operator==(const map_iterator<T> &rhs) const {
+		return entry == rhs.entry;
+	}
+	bool operator!=(const map_iterator<T> &rhs) const {
+		return entry != rhs.entry;
 	}
 
 	T &operator*() { return *(T*)entry; }
@@ -314,6 +329,7 @@ struct set: Hasher {
 	static_assert(Hasher::template hasher_compatible<T>(), "Hasher is incompatible with the type");
 
 	typedef map_iterator<T> iterator;
+	typedef map_iterator<const T> const_iterator;
 
 	set() {
 		boa_map_init(this, sizeof(T));
@@ -354,9 +370,17 @@ struct set: Hasher {
 		return (T*)this->hasher_find(&t);
 	}
 
-	iterator begin() { return boa_map_begin(this); }
+	iterator begin() { return iterator(this, boa_map_begin(this)); }
 	iterator end() { return iterator(); }
-	iterator iterate_from(T *entry) { return boa_map_iterate_from(this, entry); }
+	iterator iterate_from(const T *entry) { return iterator(this, boa_map_iterate_from(this, entry)); }
+
+	const T *find(const T &t) const {
+		return (const T*)this->hasher_find(&t);
+	}
+
+	const_iterator begin() const { return const_iterator(this, boa_map_begin(this)); }
+	const_iterator end() const { return const_iterator(); }
+	const_iterator iterate_from(const T *entry) const { return const_iterator(this, boa_map_iterate_from(this, entry)); }
 };
 
 template <typename Hasher, typename Key, typename Val>
@@ -365,6 +389,7 @@ struct map: Hasher {
 
 	typedef key_val<Key, Val> key_val;
 	typedef map_iterator<key_val> iterator;
+	typedef map_iterator<const key_val> const_iterator;
 
 	map() {
 		boa_map_init(this, sizeof(key_val));
@@ -430,12 +455,20 @@ struct map: Hasher {
 	}
 
 	key_val *find(const Key &key) {
-		return (key_val*)hasher_find(&key);
+		return (key_val*)this->hasher_find(&key);
 	}
 
-	iterator begin() { return boa_map_begin(this); }
+	iterator begin() { return iterator(this, boa_map_begin(this)); }
 	iterator end() { return iterator(); }
-	iterator iterate_from(key_val *entry) { return boa_map_iterate_from(this, entry); }
+	iterator iterate_from(const key_val *entry) { return iterator(this, boa_map_iterate_from(this, entry)); }
+
+	const key_val *find(const Key &key) const {
+		return (key_val*)this->hasher_find(&key);
+	}
+
+	const_iterator begin() const { return const_iterator(this, boa_map_begin(this)); }
+	const_iterator end() const { return const_iterator(); }
+	const_iterator iterate_from(const key_val *entry) const { return const_iterator(this, boa_map_iterate_from(this, entry)); }
 };
 
 template <typename T> using blit_set = set<blit_hasher, T>;

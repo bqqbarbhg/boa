@@ -114,6 +114,12 @@ BOA_TEST(cpp_set_u32, "C++ U32 set")
 	boa_assert(set.find(20) && *set.find(20) == 20);
 	boa_assert(set.find(30) && *set.find(30) == 30);
 	boa_assert(set.find(40) == nullptr);
+
+	const boa::u32_set<uint32_t> &ref = set;
+	boa_assert(ref.find(10) && *ref.find(10) == 10);
+	boa_assert(ref.find(20) && *ref.find(20) == 20);
+	boa_assert(ref.find(30) && *ref.find(30) == 30);
+	boa_assert(ref.find(40) == nullptr);
 }
 
 BOA_TEST(cpp_map_u32, "C++ U32 map")
@@ -127,6 +133,12 @@ BOA_TEST(cpp_map_u32, "C++ U32 map")
 	boa_assert(map.find(2) && map.find(2)->val == 20);
 	boa_assert(map.find(3) && map.find(3)->val == 30);
 	boa_assert(map.find(4) == nullptr);
+
+	const boa::u32_map<uint32_t, uint32_t> &ref = map;
+	boa_assert(ref.find(1) && ref.find(1)->val == 10);
+	boa_assert(ref.find(2) && ref.find(2)->val == 20);
+	boa_assert(ref.find(3) && ref.find(3)->val == 30);
+	boa_assert(ref.find(4) == nullptr);
 }
 
 BOA_TEST(cpp_pqueue, "C++ priority queue")
