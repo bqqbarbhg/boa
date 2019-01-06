@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="utf-8"?> 
+<AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
+
+  <Type Name="boa::buf&lt;*&gt;">
+    <DisplayString>buf{{ count={end_pos / sizeof($T1)} }}</DisplayString>
+    <Expand>
+      <Item Name="count">end_pos / sizeof($T1)</Item>
+      <Item Name="capacity">cap_pos / sizeof($T1)</Item>
+      <ArrayItems>
+        <Size>end_pos / sizeof($T1)</Size>
+        <ValuePointer>($T1*)data</ValuePointer>
+      </ArrayItems>
+    </Expand>
+  </Type>
+
+  <Type Name="boa::set&lt;*&gt;">
+    <DisplayString>map{{ count={count} }}</DisplayString>
+    <Expand>
+      <Item Name="count">count</Item>
+      <Item Name="capacity">capacity</Item>
+
+      <CustomListItems MaxItemsPerView="4096">
+        <Variable Name="ix" InitialValue="0"/>
+        <Variable Name="block" InitialValue="0"/>
+        <Variable Name="offset" InitialValue="0"/>
+        <Variable Name="block_count" InitialValue="impl.num_used_blocks"/>
+        <Variable Name="offset_count" InitialValue="0"/>
+
+        <Size>count</Size>
+        <Loop>
+          <If Condition="block >= block_count"><Break/></If>
+          <Exec>offset = 0</Exec>
+          <Exec>offset_count = impl.blocks[block].count</Exec>
+          <Loop>
+            <If Condition="offset >= offset_count"><Break/></If>
+            <Item>*(($T2*)impl.entries + impl.block_num_entries * block + offset)</Item>
+            <Exec>offset += 1</Exec>
+          </Loop>
+          <Exec>block += 1</Exec>
+        </Loop>
+      </CustomListItems>
+
+    </Expand>
+  </Type>
+
+  <Type Name="boa::map&lt;*&gt;">
+    <DisplayString>map{{ count={count} }}</DisplayString>
+    <Expand>
+      <Item Name="count">count</Item>
+      <Item Name="capacity">capacity</Item>
+
+      <CustomListItems MaxItemsPerView="4096">
+        <Variable Name="ix" InitialValue="0"/>
+        <Variable Name="block" InitialValue="0"/>
+        <Variable Name="offset" InitialValue="0"/>
+        <Variable Name="block_count" InitialValue="impl.num_used_blocks"/>
+        <Variable Name="offset_count" InitialValue="0"/>
+
+        <Size>count</Size>
+        <Loop>
+          <If Condition="block >= block_count"><Break/></If>
+          <Exec>offset = 0</Exec>
+          <Exec>offset_count = impl.blocks[block].count</Exec>
+          <Loop>
+            <If Condition="offset >= offset_count"><Break/></If>
+            <Item>*((key_val*)impl.entries + impl.block_num_entries * block + offset)</Item>
+            <Exec>offset += 1</Exec>
+          </Loop>
+          <Exec>block += 1</Exec>
+        </Loop>
+      </CustomListItems>
+
+    </Expand>
+    
+  </Type>
+
+</AutoVisualizer>
