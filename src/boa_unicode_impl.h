@@ -105,7 +105,7 @@ int boa_convert_utf16_to_utf8(boa_buf *buf, const uint16_t **ptr, const uint16_t
 int boa_convert_utf8_to_utf16(boa_buf *buf, const char **ptr, const char *end)
 {
 	int result = 1;
-	const uint8_t *p = (const uint8_t*)ptr;
+	const uint8_t *p = (const uint8_t*)*ptr;
 	uint32_t p_left = end ? (uint32_t)((const uint8_t*)end - p) : ~0u;
 	uint16_t *dst_ptr = boa_end(uint16_t, buf);
 	uint32_t dst_left = (uint32_t)(boa_cap(uint16_t, buf) - dst_ptr);
@@ -124,6 +124,7 @@ int boa_convert_utf8_to_utf16(boa_buf *buf, const char **ptr, const char *end)
 			p_left -= 1;
 		} else if ((byte & 0xE0) == 0xC0 && dst_left >= 1 && p_left >= 2) {
 			// U+0080..U+07FF: Double byte UTF8, single word UTF16
+			byte ^= 0xC0;
 			uint32_t result = ((uint32_t)byte << 6) ^ (p[1] ^ 0x80);
 			if (result >> 6 == byte) {
 				dst_ptr[0] = (uint16_t)result;
@@ -138,6 +139,7 @@ int boa_convert_utf8_to_utf16(boa_buf *buf, const char **ptr, const char *end)
 			}
 		} else if ((byte & 0xF0) == 0xE0 && dst_left >= 1 && p_left >= 3) {
 			// U+0800..U+D7FF, U+0E00..U+FFFF: Triple byte UTF8, single word UTF16
+			byte ^= 0xE0;
 			uint32_t swar = (uint32_t)p[1] << 8 | (uint32_t)p[2];
 			uint32_t result = ((uint32_t)byte << 12) | (swar & 0x3F00) >> 2 | (swar & 0x3F);
 			if ((swar & 0xC0C0) == 0x8080 && result - 0xD800 >= 0x800) {
@@ -153,6 +155,7 @@ int boa_convert_utf8_to_utf16(boa_buf *buf, const char **ptr, const char *end)
 			}
 		} else if ((byte & 0xF8) == 0xF0 && dst_left >= 2 && p_left >= 4) {
 			// U+D800..U+0DFF: Quad byte UTF8, double word UTF16 surrogate pair
+			byte ^= 0xF0;
 			uint32_t swar = (uint32_t)p[1] << 16 | (uint32_t)p[2] << 8 | (uint32_t)p[3];
 			uint32_t result = ((uint32_t)byte << 18) | (swar & 0x3F0000) >> 4 | (swar & 0x3F00) >> 2 | (swar & 0x3F);
 			if ((swar & 0xC0C0C0) == 0x808080) {
@@ -202,6 +205,71 @@ int boa_convert_utf8_to_utf16(boa_buf *buf, const char **ptr, const char *end)
 
 	return result;
 }
+
+int boa_convert_utf16_to_utf8_replace(boa_buf *buf, const uint16_t **ptr, const uint16_t *end, const char *replace, uint32_t replace_len)
+{
+	const uint16_t *prev;
+	int res;
+
+	res = boa_convert_utf16_to_utf8(buf, ptr, end);
+	while (!res) {
+		if (!boa_push_data_n(buf, replace, replace_len)) return 0;
+
+		do {
+			if (end ? *ptr == end : **ptr == 0) {
+				res = 1;
+				break;
+			} else {
+				*ptr += 1;
+				prev = *ptr;
+				res = boa_convert_utf16_to_utf8(buf, ptr, end);
+			}
+		} while (*ptr == prev);
+	}
+
+	uint8_t *zero = boa_reserve(uint8_t, buf);
+	if (zero) {
+		*zero = '\0';
+	} else {
+		return 0;
+	}
+
+	return 1;
+}
+
+int boa_convert_utf8_to_utf16_replace(boa_buf *buf, const char **ptr, const char *end, const uint16_t *replace, uint32_t replace_len)
+{
+	const char *prev;
+	int res;
+
+	res = boa_convert_utf8_to_utf16(buf, ptr, end);
+	while (!res) {
+		if (!boa_push_data_n(buf, replace, replace_len)) return 0;
+
+		do {
+			if (end ? *ptr == end : **ptr == 0) {
+				res = 1;
+				break;
+			} else {
+				*ptr += 1;
+				prev = *ptr;
+				res = boa_convert_utf8_to_utf16(buf, ptr, end);
+			}
+		} while (*ptr == prev);
+	}
+
+	uint16_t *zero = boa_reserve(uint16_t, buf);
+	if (zero) {
+		*zero = 0;
+	} else {
+		return 0;
+	}
+
+	return 1;
+}
+
+extern uint16_t boa_utf16_replacement_character[1] = { 0xFFFD };
+extern char boa_utf8_replacement_character[3] = { (char)0xEF, (char)0xBF, (char)0xBD };
 
 #endif
 

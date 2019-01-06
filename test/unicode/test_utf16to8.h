@@ -365,3 +365,84 @@ BOA_TEST(utf16to8_realloc_zero, "Should reallocate storage for missing null byte
 
 	boa_reset(&dst);
 }
+
+BOA_TEST(utf16to8_replace, "Convert and replace error characters")
+{
+	uint16_t data[] = { (uint16_t)'A', 0xDC4C, (uint16_t)'B', 0xDC4C, (uint16_t)'C', 0xDC4C, 0 };
+	const uint16_t *ptr = data;
+	char result[2];
+	boa_buf dst = boa_array_buf(result);
+	int res;
+
+	ptr = data;
+	res = boa_convert_utf16_to_utf8_replace(boa_clear(&dst), &ptr, boa_arrayend(data) - 1, "X", 1);
+
+	boa_assert(res != 0);
+	boa_assert(ptr == data + 6);
+	boa_assert(dst.end_pos == 6);
+	boa_assert(!memcmp((char*)dst.data, "AXBXCX", 7));
+
+	ptr = data;
+	res = boa_convert_utf16_to_utf8_replace(boa_clear(&dst), &ptr, NULL, "X", 1);
+
+	boa_assert(res != 0);
+	boa_assert(ptr == data + 6);
+	boa_assert(dst.end_pos == 6);
+	boa_assert(!memcmp((char*)dst.data, "AXBXCX", 7));
+
+	boa_reset(&dst);
+}
+
+BOA_TEST(utf16to8_replace_truncate_replacement, "Convert and replace truncating the replacement character")
+{
+	uint16_t data[] = { (uint16_t)'A', 0xDC4C, (uint16_t)'B', 0xDC4C, (uint16_t)'C', 0xDC4C, 0 };
+	const uint16_t *ptr = data;
+	char result[3];
+	boa_buf dst = boa_array_view(result);
+	int res;
+
+	ptr = data;
+	res = boa_convert_utf16_to_utf8_replace(boa_clear(&dst), &ptr, boa_arrayend(data) - 1, "X", 1);
+
+	boa_assert(res == 0);
+	boa_assert(ptr == data + 3);
+	boa_assert(dst.end_pos == 3);
+	boa_assert(!memcmp((char*)dst.data, "AXB", 3));
+
+	ptr = data;
+	res = boa_convert_utf16_to_utf8_replace(boa_clear(&dst), &ptr, NULL, "X", 1);
+
+	boa_assert(res == 0);
+	boa_assert(ptr == data + 3);
+	boa_assert(dst.end_pos == 3);
+	boa_assert(!memcmp((char*)dst.data, "AXB", 3));
+
+	boa_reset(&dst);
+}
+
+BOA_TEST(utf16to8_replace_truncate_convert, "Convert and replace truncating a converted character")
+{
+	uint16_t data[] = { (uint16_t)'A', 0xDC4C, (uint16_t)'B', 0xDC4C, (uint16_t)'C', 0xDC4C, 0 };
+	const uint16_t *ptr = data;
+	char result[2];
+	boa_buf dst = boa_array_view(result);
+	int res;
+
+	ptr = data;
+	res = boa_convert_utf16_to_utf8_replace(boa_clear(&dst), &ptr, boa_arrayend(data) - 1, "X", 1);
+
+	boa_assert(res == 0);
+	boa_assert(ptr == data + 2);
+	boa_assert(dst.end_pos == 2);
+	boa_assert(!memcmp((char*)dst.data, "AX", 2));
+
+	ptr = data;
+	res = boa_convert_utf16_to_utf8_replace(boa_clear(&dst), &ptr, NULL, "X", 1);
+
+	boa_assert(res == 0);
+	boa_assert(ptr == data + 2);
+	boa_assert(dst.end_pos == 2);
+	boa_assert(!memcmp((char*)dst.data, "AX", 2));
+
+	boa_reset(&dst);
+}
