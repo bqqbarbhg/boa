@@ -4,14 +4,28 @@
 #define BOA__CORE_CPP_INCLUDED
 
 #include "boa_core.h"
+#include <initializer_list>
+
+#if BOA_MSVC || BOA_GNUC
+#define boa_is_pod_type(type) __is_trivially_destructible(type)
+#else
 #include <type_traits>
-#include <utility>
-#include <functional>
+#define boa_is_pod_type(type) std::is_trivially_destructible<T>::value
+#endif
 
 extern boa_allocator boa__null_ator;
 extern boa_allocator boa__default_ator;
 
 namespace boa {
+
+// -- C++
+
+template <typename T> struct remove_reference      { typedef T type; };
+template <typename T> struct remove_reference<T&>  { typedef T type; };
+template <typename T> struct remove_reference<T&&> { typedef T type; };
+
+template <typename T>
+boa_forceinline typename remove_reference<T>::type&& move(T &&t) { return static_cast<typename remove_reference<T>::type&&>(t); }
 
 // -- boa_result
 
@@ -60,7 +74,7 @@ inline void free(void *ptr) { boa_free(ptr); }
 
 template <typename T>
 struct buf: boa_buf {
-	static_assert(std::is_trivially_destructible<T>::value, "boa::buf doesn't run destructors, use boa::obj_buf instead");
+	static_assert(boa_is_pod_type(T), "boa::buf doesn't run destructors, use boa::obj_buf instead");
 
 	buf(): boa_buf(boa_empty_buf()) { }
 	~buf() { reset(); }
@@ -245,7 +259,7 @@ struct virtual_hasher: boa_map {
 template <typename T>
 struct inline_hasher: boa_map {
 	template <typename Tref> static constexpr
-	bool hasher_compatible() { return std::is_same<T, Tref>::value; }
+	bool hasher_compatible() { return true; }
 
 	static int inline_equal(const void *a, const void *b, void *user) {
 		return *(const T*)a == *(const T*)b;
@@ -490,14 +504,21 @@ boa_inline int boa__cpp_functor_before(const void *a, const void *b, void *user)
 	return (*(F*)user)(*(const T*)a, *(const T*)b);
 }
 
-template <typename T, typename Before = std::less<T> >
+template <typename T>
+struct less {
+	constexpr bool operator()(const T& a, const T& b) const {
+		return a < b;
+	}
+};
+
+template <typename T, typename Before = less<T> >
 struct pqueue {
 	boa::buf<T> buf;
 	Before before;
 
 	pqueue() { }
-	explicit pqueue(boa::buf<T> &&buf) : buf(std::move(buf)) { }
-	pqueue(boa::buf<T> &&buf, Before before) : buf(std::move(buf)), before(before) { }
+	explicit pqueue(boa::buf<T> &&buf) : buf(move(buf)) { }
+	pqueue(boa::buf<T> &&buf, Before before) : buf(move(buf)), before(before) { }
 
 	uint32_t count() const { return boa_count(T, &buf); }
 	bool is_empty() const { return (bool)boa_is_empty(&buf); }

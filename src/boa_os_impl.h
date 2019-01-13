@@ -100,7 +100,6 @@ int boa_dir_next(boa_dir_iterator *it, boa_dir_entry *entry)
 void boa_dir_close(boa_dir_iterator *it)
 {
 	boa_assert(0 && "No filesystem support");
-	return 0;
 }
 
 #elif BOA_WINDOWS

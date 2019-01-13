@@ -65,6 +65,10 @@ float heuristic(point a, point b)
 	return sqrtf(dx*dx + dy*dy);
 }
 
+int abs(int a) {
+	return a >= 0 ? a : -a;
+}
+
 bool pathfind(boa::buf<point> &path, const map &map, point begin, point end, boa::allocator *ator = NULL)
 {
 	// Edge case: Null path
@@ -79,7 +83,7 @@ bool pathfind(boa::buf<point> &path, const map &map, point begin, point end, boa
 	boa::buf<state> states{ boa::array_buf_ator(stack_states, ator) };
 	boa::pqueue<work_item> work{ boa::array_buf_ator(stack_work, ator) };
 
-	uint32_t min_path = std::abs(end.x - begin.x) + std::abs(end.y - begin.y);
+	uint32_t min_path = abs(end.x - begin.x) + abs(end.y - begin.y);
 	closed.reserve(min_path);
 
 	state initial;
