@@ -22,6 +22,21 @@ BOA_TEST(default_realloc, "boa_realloc()")
 	boa_free(ptr);
 }
 
+BOA_TEST(default_alloc_align, "boa_alloc() should be always aligned to 8 bytes")
+{
+	void *pointers[64];
+
+	for (uint32_t i = 0; i < boa_arraycount(pointers); i++) {
+		void *ptr = boa_alloc(1);
+		boa_assert((uintptr_t)ptr % 8 == 0);
+		pointers[i] = ptr;
+	}
+
+	for (uint32_t i = 0; i < boa_arraycount(pointers); i++) {
+		boa_free(pointers[i]);
+	}
+}
+
 BOA_TEST(null_allocator, "Null allocator should return NULL for alloc")
 {
 	boa_allocator *ator = boa_null_ator();

@@ -74,8 +74,13 @@ static int boa__test_expect_fail_current = 0;
 jmp_buf *boa__test_expect_assert_jmp;
 
 typedef struct boa__test_alloc_hdr {
-	struct boa__test_alloc_hdr *next, *prev;
-	size_t size;
+	union {
+		struct {
+			struct boa__test_alloc_hdr *next, *prev;
+			size_t size;
+		};
+		uint64_t padding[4];
+	};
 } boa__test_alloc_hdr;
 
 boa__test_alloc_hdr boa__test_alloc_head;

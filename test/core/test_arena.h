@@ -122,3 +122,30 @@ BOA_TEST(arena_alloc_fail, "Arena should handle allocation failure gracefully")
 	
 	boa_arena_reset(&arena);
 }
+
+BOA_TEST(arena_align, "Arena should respect type alignment")
+{
+	boa_arena arena = { 0 };
+
+	boa_arena_push(uint8_t, &arena);
+	uintptr_t a16 = (uintptr_t)boa_arena_push(uint16_t, &arena);
+	uintptr_t b16 = (uintptr_t)boa_arena_push(uint16_t, &arena);
+	uintptr_t a32 = (uintptr_t)boa_arena_push(uint32_t, &arena);
+	boa_arena_push(uint8_t, &arena);
+	uintptr_t c16 = (uintptr_t)boa_arena_push(uint16_t, &arena);
+	boa_arena_push(uint8_t, &arena);
+	uintptr_t b32 = (uintptr_t)boa_arena_push(uint32_t, &arena);
+	uintptr_t a64 = (uintptr_t)boa_arena_push(uint64_t, &arena);
+	boa_arena_push(uint8_t, &arena);
+	uintptr_t b64 = (uintptr_t)boa_arena_push(uint64_t, &arena);
+
+	boa_assert(a16 % 2 == 0);
+	boa_assert(b16 % 2 == 0);
+	boa_assert(c16 % 2 == 0);
+	boa_assert(a32 % 4 == 0);
+	boa_assert(b32 % 4 == 0);
+	boa_assert(a64 % 8 == 0);
+	boa_assert(b64 % 8 == 0);
+
+	boa_arena_reset(&arena);
+}
