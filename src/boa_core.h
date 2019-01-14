@@ -119,6 +119,18 @@
 	#error "Unsupported platform"
 #endif
 
+#if __cplusplus >= 201103L
+	#define boa_alignof(type) alignof(type)
+#elif __STDC_VERSION__ >= 201112L
+	#define boa_alignof(type) _Alignof(type)
+#elif BOA_GNUC
+	#define boa_alignof(type) __alignof__(type)
+#elif BOA_MSVC
+	#define boa_alignof(type) __alignof(type)
+#else
+	#define boa_alignof(type) ((sizeof(type) & 7) == 0 ? 8 : ((sizeof(type) & 3) == 0 ? 4 : ((sizeof(type) & 1) == 0) ? 2 : 1))
+#endif
+
 #define BOA__CONCAT_STEP(x, y) x ## y
 #define BOA_CONCAT(x, y) BOA__CONCAT_STEP(x, y)
 
@@ -927,5 +939,51 @@ boa_inline void boa_pqueue_dequeue(boa_buf *buf, void *value, uint32_t size, boa
 	boa_buf_remove(buf, 0, size);
 	boa_downheap(buf->data, buf->end_pos, 0, size, before, user);
 }
+
+// -- boa_arena
+
+typedef struct boa__arena_impl {
+	void *data;
+	uint32_t pos, cap;
+} boa__arena_impl;
+
+typedef struct boa_arena {
+	boa_allocator *ator;
+	boa__arena_impl impl;
+} boa_arena;
+
+boa_forceinline void boa_arena_init(boa_arena *arena)
+{
+	arena->ator = NULL;
+	arena->impl.data = NULL;
+	arena->impl.pos = 0;
+	arena->impl.cap = 0;
+}
+
+boa_forceinline void boa_arena_init_ator(boa_arena *arena, boa_allocator *ator)
+{
+	arena->ator = ator;
+	arena->impl.data = NULL;
+	arena->impl.pos = 0;
+	arena->impl.cap = 0;
+}
+
+void *boa__arena_push_page(boa_arena *arena, uint32_t size);
+
+boa_forceinline void *boa_arena_push_size(boa_arena *arena, uint32_t size, uint32_t align) {
+	uint32_t pos = arena->impl.pos, cap = arena->impl.cap;
+	pos = boa_align_up(pos, align);
+	if (pos + size <= cap) {
+		arena->impl.pos = pos + size;
+		return (char*)arena->impl.data + pos;
+	} else {
+		return boa__arena_push_page(arena, size);
+	}
+}
+
+void boa_arena_reset(boa_arena *arena);
+
+#define boa_arena_push(type, arena) (type*)boa_arena_push_size((arena), sizeof(type), boa_alignof(type))
+#define boa_arena_push_n(type, arena, n) (type*)boa_arena_push_size((arena), sizeof(type) * (n), boa_alignof(type))
 
 #endif

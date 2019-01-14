@@ -9,6 +9,7 @@
 #include "core/test_format.h"
 #include "core/test_map.h"
 #include "core/test_pqueue.h"
+#include "core/test_arena.h"
 
 #include "core/test_map_impl.h"
 

@@ -728,4 +728,45 @@ void boa_downheap(void *values, uint32_t end, uint32_t index, uint32_t size, boa
 	return boa_downheap_inline(values, end, index, size, before, user);
 }
 
+// -- boa_arena
+
+typedef struct boa__arena_page {
+	boa__arena_page *next;
+	boa_allocator *ator;
+} boa__arena_page;
+
+void *boa__arena_push_page(boa_arena *arena, uint32_t size)
+{
+	uint32_t header_size = boa_align_up(sizeof(boa__arena_page), 8);
+	size = header_size + boa_align_up(size, 8);
+
+	uint32_t page_size = arena->impl.cap * 2;
+	if (page_size < 1024) page_size = 1024;
+	if (page_size < size * 2) page_size = size * 2;
+
+	boa__arena_page *prev = (boa__arena_page*)arena->impl.data;
+	boa__arena_page *page = (boa__arena_page*)boa_alloc_ator(arena->ator, page_size);
+	if (page == NULL) return NULL;
+
+	page->next = prev;
+	page->ator = arena->ator;
+
+	void *ptr = (char*)page + header_size;
+	arena->impl.data = page;
+	arena->impl.pos = size;
+	arena->impl.cap = page_size;
+	return ptr;
+}
+
+void boa_arena_reset(boa_arena *arena)
+{
+	boa__arena_page *page = (boa__arena_page*)arena->impl.data;
+	while (page != NULL) {
+		void *free_ptr = page;
+		boa_allocator *ator = page->ator;
+		page = page->next;
+		boa_free_ator(ator, free_ptr);
+	}
+}
+
 #endif
