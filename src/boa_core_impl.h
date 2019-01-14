@@ -731,7 +731,7 @@ void boa_downheap(void *values, uint32_t end, uint32_t index, uint32_t size, boa
 // -- boa_arena
 
 typedef struct boa__arena_page {
-	boa__arena_page *next;
+	struct boa__arena_page *next;
 	boa_allocator *ator;
 } boa__arena_page;
 
