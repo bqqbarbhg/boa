@@ -112,3 +112,17 @@ BOA_TEST(highest_bit_assert, "boa_highest_bit() should assert on zero")
 {
 	boa_expect_assert( boa_highest_bit(0) );
 }
+
+BOA_TEST(alignof_primitive, "boa_alignof() on primitive types")
+{
+	boa_assert(boa_alignof(uint8_t) == 1);
+	boa_assert(boa_alignof(uint16_t) == 2);
+	boa_assert(boa_alignof(uint32_t) == 4);
+	boa_assert(boa_alignof(uint64_t) == 8);
+
+#if BOA_64BIT
+	boa_assert(boa_alignof(void*) == 8);
+#else
+	boa_assert(boa_alignof(void*) == 4);
+#endif
+}
