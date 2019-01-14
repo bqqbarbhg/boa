@@ -98,3 +98,27 @@ BOA_TEST(arena_reset_empty_init, "Reset an empty arena initialized with init fun
 	boa_arena_init(&arena);
 	boa_arena_reset(&arena);
 }
+
+BOA_TEST(arena_alloc_fail, "Arena should handle allocation failure gracefully")
+{
+	boa_arena arena = { 0 };
+
+	int *ptr = boa_arena_push(int, &arena);
+	boa_assert(ptr != NULL);
+
+	boa_test_fail_next_allocation();
+
+	int failed = 0;
+	for (uint32_t i = 0; i < 10000; i++) {
+		uint32_t *ptr = boa_arena_push(uint32_t, &arena);
+
+		if (ptr == NULL) {
+			failed = 1;
+			break;
+		}
+	}
+
+	boa_assert(failed != 0);
+	
+	boa_arena_reset(&arena);
+}
