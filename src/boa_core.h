@@ -928,4 +928,41 @@ boa_inline void boa_pqueue_dequeue(boa_buf *buf, void *value, uint32_t size, boa
 	boa_downheap(buf->data, buf->end_pos, 0, size, before, user);
 }
 
+// -- boa_sort
+
+boa_forceinline void boa_sort(void *data, uint32_t num, uint32_t size, boa_before_fn before, void *user)
+{
+	typedef struct { uint32_t lo, hi; } range;
+	range ranges[64];
+	uint32_t num_ranges;
+
+	ranges[0].lo = 0;
+	ranges[0].hi = num;
+	num_ranges = 1;
+
+	char *bytes = (char*)data;
+
+	while (num_ranges > 0) {
+		num_ranges--;
+		uint32_t lo = ranges[num_ranges].lo;
+		uint32_t hi = ranges[num_ranges].hi;
+		if (lo + 1 >= hi) continue;
+
+		uint32_t pivot = lo + ((hi - lo) >> 1);
+		uint32_t bound_lo = lo;
+		uint32_t bound_hi = hi;
+		uint32_t ref = hi * size - size;
+
+		if (pivot < hi - 1)
+			boa_swap_inline(bytes + pivot * size, bytes + ref, size);
+
+
+		for (uint32_t i = bound_lo; i < bound_hi; ) {
+			if (before(bytes + i * size, bytes + ref, user)) {
+			}
+
+		}
+	}
+}
+
 #endif
