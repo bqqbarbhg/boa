@@ -115,7 +115,7 @@ struct boa_dir_iterator {
 boa_dir_iterator *boa_dir_open(const char *path, const char *path_end, boa_result *result)
 {
 	boa_result res;
-	boa_dir_iterator *it = (boa_dir_iterator*)boa_alloc(sizeof(boa_dir_iterator));
+	boa_dir_iterator *it = boa_make(boa_dir_iterator);
 	it->name_buf = boa_array_buf(it->name_buf_data);
 
 	const char *ptr = path;

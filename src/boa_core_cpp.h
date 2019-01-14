@@ -74,6 +74,15 @@ inline void *alloc(size_t size) { return boa_alloc(size); }
 inline void *realloc(void *ptr, size_t size) { return boa_realloc(ptr, size); }
 inline void free(void *ptr) { boa_free(ptr); }
 
+template <typename T> T *make() { return (T*)boa_check_ptr(boa_make(T)); }
+template <typename T> T *make_ator(boa_allocator *ator) { return (T*)boa_check_ptr(boa_make_ator(T, ator)); }
+template <typename T> T *make_n(uint32_t count) { return (T*)boa_check_ptr(boa_make_n(T, count)); }
+template <typename T> T *make_n_ator(uint32_t count, boa_allocator *ator) { return (T*)boa_check_ptr(boa_make_n_ator(T, count, ator)); }
+template <typename T> T *try_make() { return boa_make(T); }
+template <typename T> T *try_make_ator(boa_allocator *ator) { return boa_make_ator(T, ator); }
+template <typename T> T *try_make_n(uint32_t count) { return boa_make_n(T, count); }
+template <typename T> T *try_make_n_ator(uint32_t count, boa_allocator *ator) { return boa_make_n_ator(T, count, ator); }
+
 // -- boa_buf
 
 template <typename T>

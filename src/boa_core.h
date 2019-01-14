@@ -275,6 +275,11 @@ boa_inline void boa_free_ator(boa_allocator *ator, void *ptr) {
 boa_inline boa_allocator *boa_heap_ator() { extern boa_allocator boa__heap_ator; return &boa__heap_ator; }
 boa_inline boa_allocator *boa_null_ator() { extern boa_allocator boa__null_ator; return &boa__null_ator; }
 
+#define boa_make(type) (type*)boa_alloc(sizeof(type))
+#define boa_make_ator(type, ator) (type*)boa_alloc_ator((ator), sizeof(type))
+#define boa_make_n(type, n) (type*)boa_alloc((n) * sizeof(type))
+#define boa_make_n_ator(type, n, ator) (type*)boa_alloc_ator((ator), (n) * sizeof(type))
+
 // -- boa_buf
 
 #define BOA_BUF_FLAG_ALLOCATED 1
