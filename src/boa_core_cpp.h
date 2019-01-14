@@ -45,6 +45,10 @@ struct pod {
 	const T& operator*() const { return *(const T*)data; }
 	T* operator->() { return (T*)data; }
 	const T* operator->() const { return (const T*)data; }
+
+	void reset() {
+		((T*)data)->~T();
+	}
 };
 
 // -- boa_allocator
@@ -541,6 +545,88 @@ struct pqueue {
 	}
 };
 
+// -- boa_arena
+
+struct arena : boa_arena {
+
+	arena() {
+		boa_arena_init(this);
+	}
+
+	explicit arena(boa_allocator *ator) {
+		boa_arena_init_ator(this, ator);
+	}
+
+	void *push_size(uint32_t size, uint32_t align) {
+		return boa_arena_push_size(this, size, align);
+	}
+
+	~arena() {
+		boa_arena_reset(this);
+	}
+
+	template <typename T>
+	T *push() {
+		static_assert(boa_is_pod_type(T), "Use push_obj() for non-pod types");
+		T *ptr = boa_arena_push(T, this);
+		boa_assert(ptr != NULL);
+		return ptr;
+	}
+
+	template <typename T>
+	T *push_n(uint32_t count) {
+		static_assert(boa_is_pod_type(T), "Use push_obj_n() for non-pod types");
+		T *ptr = boa_arena_push_n(T, this, count);
+		boa_assert(ptr != NULL);
+		return ptr;
+	}
+
+	template <typename T>
+	T *try_push() {
+		static_assert(boa_is_pod_type(T), "Use try_push_obj() for non-pod types");
+		T *ptr = boa_arena_push(T, this);
+		return ptr;
+	}
+
+	template <typename T>
+	T *try_push_n(uint32_t count) {
+		static_assert(boa_is_pod_type(T), "Use try_push_obj_n() for non-pod types");
+		T *ptr = boa_arena_push_n(T, this, count);
+		return ptr;
+	}
+
+	template <typename T>
+	T *push_obj() {
+		T *ptr = boa_arena_push(T, this);
+		boa_assert(ptr != NULL);
+		new (ptr) T();
+		return ptr;
+	}
+
+	template <typename T>
+	T *push_obj_n(uint32_t count) {
+		T *ptr = boa_arena_push_n(T, this, count);
+		boa_assert(ptr != NULL);
+		for (uint32_t i = 0; i < count; i++) new (ptr) T();
+	}
+
+	template <typename T>
+	T *try_push_obj() {
+		T *ptr = boa_arena_push(T, this);
+		if (ptr != NULL) new (ptr) T();
+		return ptr;
+	}
+
+	template <typename T>
+	T *try_push_obj_n(uint32_t count) {
+		T *ptr = boa_arena_push_n(T, this, count);
+		if (ptr != NULL) {
+			for (uint32_t i = 0; i < count; i++) new (ptr) T();
+		}
+	}
+
+};
+
 // -- Pod aliases
 
 template <typename T> using pod_buf = pod<buf<T>>;
@@ -551,6 +637,7 @@ template <typename Key, typename Val> using pod_blit_map = pod<blit_map<Key, Val
 template <typename Key, typename Val> using pod_ptr_map = pod<ptr_map<Key, Val>>;
 template <typename Key, typename Val> using pod_u32_map = pod<u32_map<Key, Val>>;
 template <typename T> using pod_pqueue = pod<pqueue<T>>;
+using pod_arena = pod<arena>;
 
 }
 

@@ -194,3 +194,15 @@ BOA_TEST(cpp_pqueue_array, "C++ Array backed priority queue")
 	boa_assert(pq.is_empty());
 	boa_expect_assert( pq.dequeue() );
 }
+
+BOA_TEST(cpp_arena_simple, "Simple C++ arena test")
+{
+	boa::arena arena;
+
+	int *a = arena.push<int>();
+	int *b = arena.push<int>();
+
+	boa_assert(a != NULL);
+	boa_assert(b != NULL);
+	boa_assert(a != b);
+}
