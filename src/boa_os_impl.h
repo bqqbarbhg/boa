@@ -10,6 +10,10 @@
 	#define BOA_NO_FILESYSTEM 0
 #endif
 
+#if !defined(BOA_NO_THREADS)
+	#define BOA_NO_THREADS 0
+#endif
+
 #if BOA_MSVC
 	#include <intrin.h>
 #elif BOA_GNUC
@@ -76,7 +80,7 @@ double boa_perf_sec(uint64_t delta)
 	return (double)delta / (double)freq;
 }
 
-// File IO
+// -- File IO
 
 int boa_has_filesystem()
 {
@@ -167,6 +171,94 @@ void boa_dir_close(boa_dir_iterator *it)
 	boa_free(it);
 }
 
+#else
+	#error "No filesystem implementation for OS"
+#endif
+
+// -- Threading
+
+#if BOA_NO_FILESYSTEM
+
+boa_thread *boa_create_thread(const boa_thread_opts *opts)
+{
+	return nullptr;
+}
+
+void boa_join_thread(boa_thread *thread { }
+
+#elif BOA_WINDOWS
+
+// Windows thread name is set by throwing a special exception...
+// https://docs.microsoft.com/en-us/visualstudio/debugger/how-to-set-a-thread-name-in-native-code
+
+const DWORD MS_VC_EXCEPTION = 0x406D1388;  
+#pragma pack(push,8)  
+typedef struct { DWORD dwType; LPCSTR szName; DWORD dwThreadID; DWORD dwFlags; } THREADNAME_INFO;  
+#pragma pack(pop)  
+void SetThreadName(DWORD dwThreadID, const char* threadName) {  
+    THREADNAME_INFO info = { 0x1000, threadName, dwThreadID, 0 };
+#pragma warning(push)  
+#pragma warning(disable: 6320 6322)  
+    __try{  
+        RaiseException(MS_VC_EXCEPTION, 0, sizeof(info) / sizeof(ULONG_PTR), (ULONG_PTR*)&info);  
+    } __except (EXCEPTION_EXECUTE_HANDLER) { }  
+#pragma warning(pop)  
+}  
+
+struct boa_thread {
+	boa_allocator *ator;
+	boa_thread_entry entry;
+	void *user;
+
+	HANDLE handle;
+	DWORD thread_id;
+};
+
+DWORD WINAPI boa__win32_thread_entry(LPVOID arg)
+{
+	boa_thread *thread = (boa_thread*)arg;
+	thread->entry(thread->user);
+	return 0;
+}
+
+boa_thread *boa_create_thread(const boa_thread_opts *opts)
+{
+	boa_thread *thread = boa_make_ator(boa_thread, opts->ator);
+	if (thread == NULL) return NULL;
+
+	thread->entry = opts->entry;
+	thread->user = opts->user;
+	thread->ator = opts->ator;
+
+	thread->handle = CreateThread(NULL,
+			opts->stack_size,
+			&boa__win32_thread_entry,
+			thread,
+			0,
+			&thread->thread_id);
+
+	if (thread->handle == NULL) {
+		boa_free_ator(opts->ator, thread);
+		return NULL;
+	}
+
+	if (opts->debug_name) {
+		SetThreadName(thread->thread_id, opts->debug_name);
+	}
+
+	return thread;
+}
+
+void boa_join_thread(boa_thread *thread)
+{
+	boa_assert(thread != NULL);
+	WaitForSingleObject(thread->handle, INFINITE);
+	CloseHandle(thread->handle);
+	boa_free_ator(thread->ator, thread);
+}
+
+#else
+	#error "No thread implementation for OS"
 #endif
 
 #endif

@@ -14,6 +14,7 @@
 #include "core/test_map_impl.h"
 
 #include "os/test_os.h"
+#include "os/test_os_thread.h"
 
 #include "unicode/test_utf16to8.h"
 #include "unicode/test_utf8to16.h"

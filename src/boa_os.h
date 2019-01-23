@@ -40,5 +40,22 @@ boa_dir_iterator *boa_dir_open(const char *path, const char *path_end, boa_resul
 int boa_dir_next(boa_dir_iterator *it, boa_dir_entry *entry);
 void boa_dir_close(boa_dir_iterator *it);
 
+// -- Threading
+
+typedef struct boa_thread boa_thread;
+
+typedef void (*boa_thread_entry)(void *user);
+
+typedef struct boa_thread_opts {
+	boa_allocator *ator;
+	boa_thread_entry entry;
+	void *user;
+	const char *debug_name;
+	size_t stack_size;
+} boa_thread_opts;
+
+boa_thread *boa_create_thread(const boa_thread_opts *opts);
+void boa_join_thread(boa_thread *thread);
+
 #endif
 
