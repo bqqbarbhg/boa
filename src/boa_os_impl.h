@@ -22,6 +22,11 @@
 	#include <Windows.h>
 	#include "boa_unicode.h"
 #elif BOA_LINUX
+
+#if !defined(_GNU_SOURCE)
+	#define _GNU_SOURCE
+#endif
+
 	#include <time.h>
 	#include <sys/time.h>
 
