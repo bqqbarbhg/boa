@@ -3,10 +3,10 @@ sudo: false
 language: cpp
 
 script:
-    - clang++ test/test.cpp -pthread -Isrc -std=c++11 -Wno-unused-value -o test_cpp
-    - clang test/test.c -pthread -Isrc -std=gnu99 -Wno-unused-value -o test_c
-    - clang++ test/test.cpp -pthread -Isrc -std=c++11 -Wno-unused-value -DBOA_GENERIC=1 -o test_generic_cpp
-    - clang test/test.c -pthread -Isrc -std=gnu11 -Wno-unused-value -DBOA_GENERIC=1 -o test_generic_c
+    - clang++ test/test.cpp -pthread -Isrc -std=c++11 -Wno-unused-value -o test_cpp -D_GNU_SOURCE
+    - clang test/test.c -pthread -Isrc -std=gnu99 -Wno-unused-value -o test_c -D_GNU_SOURCE
+    - clang++ test/test.cpp -pthread -Isrc -std=c++11 -Wno-unused-value -DBOA_GENERIC=1 -o test_generic_cpp -D_GNU_SOURCE
+    - clang test/test.c -pthread -Isrc -std=gnu11 -Wno-unused-value -DBOA_GENERIC=1 -o test_generic_c -D_GNU_SOURCE
     - ./test_cpp
     - ./test_c
     - ./test_generic_cpp
