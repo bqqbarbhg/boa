@@ -28,6 +28,20 @@
 #elif BOA_LINUX
 	#include <time.h>
 	#include <sys/time.h>
+
+#if !defined(BOA_PTHREAD)
+	#define BOA_PTHREAD 1
+#endif
+
+#endif
+
+#if !defined(BOA_PTHREAD)
+	#define BOA_PTHREAD 0
+#endif
+
+#if BOA_PTHREAD
+	#include <sys/types.h>
+	#include <pthread.h>
 #endif
 
 const boa_error boa_err_no_filesystem = { "Built without filesystem support" };
@@ -226,9 +240,9 @@ boa_thread *boa_create_thread(const boa_thread_opts *opts)
 	boa_thread *thread = boa_make_ator(boa_thread, opts->ator);
 	if (thread == NULL) return NULL;
 
+	thread->ator = opts->ator;
 	thread->entry = opts->entry;
 	thread->user = opts->user;
-	thread->ator = opts->ator;
 
 	thread->handle = CreateThread(NULL,
 			opts->stack_size,
@@ -254,6 +268,69 @@ void boa_join_thread(boa_thread *thread)
 	boa_assert(thread != NULL);
 	WaitForSingleObject(thread->handle, INFINITE);
 	CloseHandle(thread->handle);
+	boa_free_ator(thread->ator, thread);
+}
+
+#elif BOA_PTHREAD
+
+struct boa_thread {
+	boa_allocator *ator;
+	boa_thread_entry entry;
+	void *user;
+
+	pthread_t pthread;
+};
+
+void *boa__pthread_thread_entry(void *arg)
+{
+	boa_thread *thread = (boa_thread*)arg;
+	thread->entry(thread->user);
+	return NULL;
+}
+
+boa_thread *boa_create_thread(const boa_thread_opts *opts)
+{
+	boa_thread *thread = boa_make_ator(boa_thread, opts->ator);
+	if (thread == NULL) return NULL;
+	int res = 0;
+
+	thread->ator = opts->ator;
+	thread->entry = opts->entry;
+	thread->user = opts->user;
+
+	boa_pthread_attr_t attr;
+	res = pthread_attr_init(&attr);
+
+	if (res == 0 && opts->stack_size) {
+		res = pthread_attr_setstacksize(&attr, opts->stack_size);
+	}
+
+	if (res != 0) {
+		boa_free_ator(thread->ator, thread);
+		return NULL;
+	}
+
+	res = pthread_create(&thread->pthread, &attr, &boa__pthread_thread_entry, thread);
+	pthread_attr_destroy(&attr);
+
+	if (res != 0) {
+		boa_free_ator(thread->ator, thread);
+		return NULL;
+	}
+
+#if BOA_LINUX
+	if (opts->debug_name) {
+		pthread_setname_np(thread->pthread, opts->debug_name);
+	}
+#endif
+
+	return thread;
+}
+
+void boa_join_thread(boa_thread *thread)
+{
+	boa_assert(thread != NULL);
+	pthread_join(thread->pthread, NULL);
 	boa_free_ator(thread->ator, thread);
 }
 
