@@ -10,10 +10,6 @@
 	#define BOA_NO_FILESYSTEM 0
 #endif
 
-#if !defined(BOA_NO_THREADS)
-	#define BOA_NO_THREADS 0
-#endif
-
 #if BOA_MSVC
 	#include <intrin.h>
 #elif BOA_GNUC
@@ -32,6 +28,10 @@
 #if !defined(BOA_PTHREAD)
 	#define BOA_PTHREAD 1
 #endif
+
+	// TEMP
+	#undef BOA_NO_FILESYSTEM
+	#define BOA_NO_FILESYSTEM 1
 
 #endif
 
@@ -191,7 +191,7 @@ void boa_dir_close(boa_dir_iterator *it)
 
 // -- Threading
 
-#if BOA_NO_FILESYSTEM
+#if BOA_SINGLETHREADED
 
 boa_thread *boa_create_thread(const boa_thread_opts *opts)
 {
@@ -298,7 +298,7 @@ boa_thread *boa_create_thread(const boa_thread_opts *opts)
 	thread->entry = opts->entry;
 	thread->user = opts->user;
 
-	boa_pthread_attr_t attr;
+	pthread_attr_t attr;
 	res = pthread_attr_init(&attr);
 
 	if (res == 0 && opts->stack_size) {
