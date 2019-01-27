@@ -23,20 +23,12 @@
 	#include "boa_unicode.h"
 #elif BOA_LINUX
 
-#if !defined(_GNU_SOURCE)
-	#define _GNU_SOURCE
-#endif
+	#undef BOA_POSIX
+	#define BOA_POSIX 1
 
-	#include <time.h>
-	#include <sys/time.h>
-
-#if !defined(BOA_PTHREAD)
+#if !defined(BOA_PTHREAD) && !defined(BOA_SINGLETHREADED)
 	#define BOA_PTHREAD 1
 #endif
-
-	// TEMP
-	#undef BOA_NO_FILESYSTEM
-	#define BOA_NO_FILESYSTEM 1
 
 #endif
 
@@ -44,13 +36,25 @@
 	#define BOA_PTHREAD 0
 #endif
 
+#if !defined(BOA_POSIX)
+	#define BOA_POSIX 0
+#endif
+
+#if BOA_POSIX
+	#include <time.h>
+	#include <sys/time.h>
+	#include <sys/types.h>
+	#include <unistd.h>
+	#include <dirent.h>
+#endif
+
 #if BOA_PTHREAD
 	#include <sys/types.h>
 	#include <pthread.h>
 #endif
 
-const boa_error boa_err_no_filesystem = { "Built without filesystem support" };
-const boa_error boa_err_file_not_found = { "File not found" };
+const boa_error boa_err_no_filesystem = { "boa_err_no_filesystem", "Built without filesystem support" };
+const boa_error boa_err_file_not_found = { "boa_err_file_not_found", "File not found" };
 
 uint64_t boa_cycle_timestamp()
 {
@@ -62,6 +66,7 @@ uint64_t boa_cycle_timestamp()
 }
 
 #if BOA_WINDOWS
+
 uint64_t boa_perf_timer()
 {
 	LARGE_INTEGER counter;
@@ -79,7 +84,9 @@ uint64_t boa_perf_freq()
 	}
 	return boa__win_perf_freq;
 }
-#elif BOA_LINUX
+
+#elif BOA_POSIX
+
 uint64_t boa_perf_timer()
 {
 	struct timespec ts;
@@ -91,6 +98,7 @@ uint64_t boa_perf_freq()
 {
 	return 1000000000ull;
 }
+
 #endif
 
 double boa_perf_sec(uint64_t delta)
@@ -153,11 +161,15 @@ boa_dir_iterator *boa_dir_open(const char *path, const char *path_end, boa_resul
 	it->handle = FindFirstFileW((WCHAR*)it->name_buf.data, &it->data);
 
 	if (it->handle == INVALID_HANDLE_VALUE) {
-		if (GetLastError() != ERROR_FILE_NOT_FOUND) {
-			if (result) *result = &boa_err_file_not_found;
-			boa_dir_close(it);
-			return NULL;
+		if (result) {
+			if (GetLastError() == ERROR_FILE_NOT_FOUND) {
+				 *result = &boa_err_file_not_found;
+			} else {
+				 *result = &boa_err_unknown;
+			}
 		}
+		boa_dir_close(it);
+		return NULL;
 	}
 
 	return it;
@@ -170,6 +182,8 @@ int boa_dir_next(boa_dir_iterator *it, boa_dir_entry *entry)
 
 	while (it->begin || FindNextFileW(it->handle, &it->data)) {
 		it->begin = 0;
+
+		entry->directory = (it->data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) ? 1 : 0;
 
 		const uint16_t *ptr = (const uint16_t*)it->data.cFileName;
 		boa_result res = boa_convert_utf16_to_utf8(boa_clear(&it->name_buf), &ptr, NULL);
@@ -188,6 +202,70 @@ void boa_dir_close(boa_dir_iterator *it)
 	CloseHandle(it->handle);
 	boa_reset(&it->name_buf);
 	boa_free(it);
+}
+
+#elif BOA_POSIX
+
+struct boa_dir_iterator {
+	DIR *dirp;
+	struct dirent *dirent;
+	char name_buf_data[256];
+	boa_buf name_buf;
+};
+
+boa_dir_iterator *boa_dir_open(const char *path, const char *path_end, boa_result *result)
+{
+	boa_result res;
+	boa_dir_iterator *it = boa_make(boa_dir_iterator);
+	it->name_buf = boa_array_buf(it->name_buf_data);
+	it->dirp = NULL;
+
+	const char *path_str = path;
+	if (path_end != NULL) {
+		char zero = '\0';
+		int res = 1;
+		res = res && boa_push_data_n(&it->name_buf, path, path_end - path);
+		res = res && boa_push_data(&it->name_buf, &zero);
+		if (res == 0) {
+			if (result) *result = &boa_err_no_space;
+			boa_dir_close(it);
+			return NULL;
+		}
+		path_str = boa_begin(char, it->name_buf);
+	}
+	it->dirp = opendir(path_str);
+
+	if (it->dirp == NULL) {
+		if (result) {
+			if (errno == ENOENT) {
+				*result = &boa_err_file_not_found;
+			} else {
+				*result = &boa_err_unknown;
+			}
+		}
+	}
+
+	return it;
+}
+
+int boa_dir_next(boa_dir_iterator *it, boa_dir_entry *entry)
+{
+	boa_assert(it != NULL);
+	boa_assert(it->dirp != NULL);
+	
+	it->dirent = readdir(it->dirp);
+
+#if defined(_DIRENT_HAVE_D_TYPE) && defined(DT_DIR) && defined(DT_UNKNOWN)
+	if (it->dirent->d_type != DT_UNKNOWN) {
+		entry->directory = (it->dirent->d_type == DT_DIR) ? 1 : 0;
+		return 1;
+	}
+#endif
+
+}
+
+void boa_dir_close(boa_dir_iterator *it)
+{
 }
 
 #else
@@ -323,7 +401,7 @@ boa_thread *boa_create_thread(const boa_thread_opts *opts)
 		return NULL;
 	}
 
-#if BOA_LINUX
+#if BOA_LINUX && defined(_GNU_SOURCE)
 	if (opts->debug_name) {
 		pthread_setname_np(thread->pthread, opts->debug_name);
 	}

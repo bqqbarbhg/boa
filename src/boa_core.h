@@ -171,10 +171,12 @@ boa_forceinline void *boa_check_ptr(const void *ptr)
 // -- boa_error
 
 typedef struct boa_error {
+	const char *name;
 	const char *description;
 } boa_error;
 
 extern const boa_error boa_err_no_space; // Allocator is out of space
+extern const boa_error boa_err_unknown;  // Unknown error
 
 typedef const boa_error *boa_result;
 

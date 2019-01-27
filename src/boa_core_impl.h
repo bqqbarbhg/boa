@@ -12,7 +12,8 @@
 
 // -- boa_error
 
-const boa_error boa_err_no_space = { "Allocator is out of space" };
+const boa_error boa_err_no_space = { "boa_err_no_space", "Allocator is out of space" };
+const boa_error boa_err_unknown = { "boa_err_unknown", "Unknown error" };
 
 // -- Utility
 

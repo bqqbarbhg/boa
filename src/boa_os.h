@@ -25,6 +25,9 @@ double boa_perf_sec(uint64_t delta);
 typedef struct boa_dir_entry {
 	// UTF8 encoded name relative to the parent
 	const char *name;
+
+	// If non-zero this entry is a directory
+	int directory;
 } boa_dir_entry;
 
 // -- File IO
