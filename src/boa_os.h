@@ -29,15 +29,22 @@ typedef struct boa_dir_entry {
 
 // -- File IO
 
-extern const boa_error boa_err_no_filesystem;
-extern const boa_error boa_err_file_not_found;
+extern const boa_error_type boa_err_no_filesystem;
+extern const boa_error_type boa_err_file_not_found;
+extern const boa_error_type boa_err_bad_filename;
 
 typedef struct boa_dir_iterator boa_dir_iterator;
 
 int boa_has_filesystem();
 
-boa_dir_iterator *boa_dir_open(const char *path, const char *path_end, boa_result *result);
-int boa_dir_next(boa_dir_iterator *it, boa_dir_entry *entry);
+typedef enum boa_dir_status {
+	boa_dir_ok = 0,
+	boa_dir_end = 1,
+	boa_dir_error = 2,
+} boa_dir_status;
+
+boa_dir_iterator *boa_dir_open(const char *path, boa_error **error);
+boa_dir_status boa_dir_next(boa_dir_iterator *it, boa_error **error);
 void boa_dir_close(boa_dir_iterator *it);
 
 // -- Threading

@@ -49,8 +49,26 @@
 	#include <pthread.h>
 #endif
 
-const boa_error boa_err_no_filesystem = { "Built without filesystem support" };
-const boa_error boa_err_file_not_found = { "File not found" };
+const boa_error_type boa_err_no_filesystem = { "boa_err_no_filesystem", "Built without filesystem support" };
+const boa_error_type boa_err_file_not_found = { "boa_err_file_not_found", "File not found" };
+
+#if BOA_WINDOWS
+
+void boa__win32_push_last_error(boa_error **error, const char *context)
+{
+	boa_err_win32_data *data = (boa_err_win32_data*)boa_error_push(error, &boa_err_win32, context);
+	if (data) {
+		data->code = (uint32_t)GetLastError();
+	}
+}
+
+void boa__win32_push_error_code(boa_error **error, uint32_t code, const char *context)
+{
+	boa_err_win32_data *data = (boa_err_win32_data*)boa_error_push(error, &boa_err_win32, context);
+	data->code = code;
+}
+
+#endif
 
 uint64_t boa_cycle_timestamp()
 {
@@ -108,9 +126,9 @@ int boa_has_filesystem()
 
 #if BOA_NO_FILESYSTEM
 
-boa_dir_iterator *boa_dir_open(const char *path, const char *path_end, boa_result *result)
+boa_dir_iterator *boa_dir_open(const char *path, const char *path_end, boa_error **error)
 {
-	if (result) *result = &boa_err_no_filesystem;
+	boa_error_push(error, &boa_err_no_filesystem, "boa_dir_open()");
 	return NULL;
 }
 
@@ -135,40 +153,65 @@ struct boa_dir_iterator {
 	boa_buf name_buf;
 };
 
-boa_dir_iterator *boa_dir_open(const char *path, const char *path_end, boa_result *result)
+boa_dir_iterator *boa_dir_open(const char *path, boa_error **error)
 {
-	boa_result res;
-	boa_dir_iterator *it = boa_make(boa_dir_iterator);
+	boa_error_type *errtype = NULL;
+	boa_dir_iterator *it = NULL;
+
+	it = boa_make(boa_dir_iterator);
+	if (it == NULL) {
+		errtype = &boa_err_no_space;
+		goto error;
+	}
+
+	it->handle = INVALID_HANDLE_VALUE;
 	it->name_buf = boa_array_buf(it->name_buf_data);
 
 	const char *ptr = path;
-	res = boa_convert_utf8_to_utf16(boa_clear(&it->name_buf), &ptr, path_end);
-	if (res != boa_ok) {
-		if (result) *result = res;
-		boa_dir_close(it);
-		return NULL;
+	boa_convert_utf8_to_utf16(boa_clear(&it->name_buf), &ptr, NULL, error);
+	if (*error) {
+		errtype = &boa_err_bad_filename;
+		goto error;
 	}
 
 	it->begin = 1;
 	it->handle = FindFirstFileW((WCHAR*)it->name_buf.data, &it->data);
 
 	if (it->handle == INVALID_HANDLE_VALUE) {
-		if (GetLastError() != ERROR_FILE_NOT_FOUND) {
-			if (result) *result = &boa_err_file_not_found;
-			boa_dir_close(it);
-			return NULL;
-		}
+		DWORD code = GetLastError();
+		boa__win32_push_error_code(error, code, "FindFirstFileW()");
+		errtype = code == ERROR_FILE_NOT_FOUND ? &boa_err_file_not_found : &boa_err_external;
+		goto error;
 	}
 
 	return it;
+
+error:
+	boa_error_push(error, errtype, "boa_dir_open()");
+	if (it) boa_dir_close(it);
+	return NULL;
 }
 
-int boa_dir_next(boa_dir_iterator *it, boa_dir_entry *entry)
+boa_dir_status boa_dir_next(boa_dir_iterator *it, boa_dir_entry *entry, boa_error **error)
 {
 	boa_assert(it != NULL);
 	boa_assert(it->handle != INVALID_HANDLE_VALUE);
 
-	while (it->begin || FindNextFileW(it->handle, &it->data)) {
+	if (!it->begin) {
+		BOOL result = FindNextFileW(it->handle, &it->data);
+		if (!result) {
+			DWORD code = GetLastError();
+			if (code == ERROR_NO_MORE_FILES) {
+				return boa_dir_end;
+			} else {
+				boa__win32_push_error_code(error, code, "FindNextFileW()");
+				boa_error_push(error, &boa_err_external, "boa_dir_next()");
+				return boa_dir_error;
+			}
+		}
+	}
+
+	while (it->begin || ) {
 		it->begin = 0;
 
 		const uint16_t *ptr = (const uint16_t*)it->data.cFileName;
@@ -185,7 +228,8 @@ int boa_dir_next(boa_dir_iterator *it, boa_dir_entry *entry)
 void boa_dir_close(boa_dir_iterator *it)
 {
 	boa_assert(it != NULL);
-	CloseHandle(it->handle);
+	if (it->handle != INVALID_HANDLE_VALUE)
+		CloseHandle(it->handle);
 	boa_reset(&it->name_buf);
 	boa_free(it);
 }

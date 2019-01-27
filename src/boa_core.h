@@ -168,18 +168,6 @@ boa_forceinline void *boa_check_ptr(const void *ptr)
 	return (void*)ptr;
 }
 
-// -- boa_error
-
-typedef struct boa_error {
-	const char *description;
-} boa_error;
-
-extern const boa_error boa_err_no_space; // Allocator is out of space
-
-typedef const boa_error *boa_result;
-
-#define boa_ok ((const boa_error*)0)
-
 // -- Utility
 
 boa_forceinline uint32_t boa_align_up(uint32_t value, uint32_t align)
@@ -370,6 +358,12 @@ boa_forceinline int
 boa_buf_push_buf(boa_buf *dst, const boa_buf *src)
 {
 	return boa_buf_push_data(dst, src->data, src->end_pos);
+}
+
+boa_forceinline int
+boa_buf_push_str(boa_buf *dst, const char *str)
+{
+	return boa_buf_push_data(dst, src, strlen(str));
 }
 
 boa_forceinline boa_allocator *
@@ -973,6 +967,13 @@ boa_forceinline void boa_arena_init_ator(boa_arena *arena, boa_allocator *ator)
 	arena->impl.cap = 0;
 }
 
+boa_arena *boa_arena_make_ator(uint32_t initial_cap, boa_allocator *ator);
+
+boa_forceinline boa_arena *boa_arena_make(uint32_t initial_cap)
+{
+	return boa_arena_make_ator(initial_cap, NULL);
+}
+
 void *boa__arena_push_page(boa_arena *arena, uint32_t size);
 
 boa_forceinline void *boa_arena_push_size(boa_arena *arena, uint32_t size, uint32_t align) {
@@ -990,5 +991,72 @@ void boa_arena_reset(boa_arena *arena);
 
 #define boa_arena_push(type, arena) (type*)boa_arena_push_size((arena), sizeof(type), boa_alignof(type))
 #define boa_arena_push_n(type, arena, n) (type*)boa_arena_push_size((arena), sizeof(type) * (n), boa_alignof(type))
+
+// -- boa_error
+
+typedef struct boa_error_type {
+	const char *name;
+	const char *description;
+	boa_error_format_fn *format;
+	size_t size;
+} boa_error_type;
+
+typedef struct boa_error {
+	const boa_error_type *type;
+	boa_error *cause;
+	const char *context;
+
+} boa_error;
+
+typedef struct boa_error_buf {
+	boa_error *error;
+	boa_arena *arena;
+} boa_error_buf;
+
+typedef int (*boa_error_format_fn)(boa_buf *buf, const boa_error *error);
+
+boa_forceinline int boa_error_format(boa_buf *buf, const boa_error *error)
+{
+	boa_assert(buf != NULL && error != NULL);
+	return error->type->format(buf, error);
+}
+
+boa_forceinline int boa_has_error(boa_error **error)
+{
+	return error && *error;
+}
+
+boa_forceinline void boa_error_reset(boa_error **error)
+{
+	if (error) {
+		boa_arena_reset((*error)->arena);
+		*error = NULL;
+	}
+}
+
+void *boa_error_push(boa_error **error, const boa_error_type *type, const char *context);
+
+int boa_error_simple_format(boa_buf *buf, const boa_error *error);
+
+extern const boa_error_type boa_err_no_space;
+extern const boa_error_type boa_err_external;
+
+extern const boa_error_type boa_err_errno;
+typedef struct boa_err_errno_data {
+	boa_error error;
+	int errno;
+};
+
+extern const boa_error_type boa_err_win32;
+typedef struct boa_err_win32_data {
+	boa_error error;
+	uint32_t code;
+};
+
+extern const boa_error_type boa_err_hresult;
+typedef struct boa_err_hresult_data {
+	boa_error error;
+	uint32_t hresult;
+};
 
 #endif

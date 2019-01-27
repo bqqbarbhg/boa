@@ -735,6 +735,29 @@ typedef struct boa__arena_page {
 	boa_allocator *ator;
 } boa__arena_page;
 
+boa_arena *boa_arena_make_ator(uint32_t initial_cap, boa_allocator *ator)
+{
+	uint32_t arena_size = boa_align_up(sizeof(boa_arena), 8);
+	uint32_t header_size = boa_align_up(sizeof(boa__arena_page), 8);
+	if (initial_cap < 128) initial_cap = 128;
+
+	uint32_t total_size = arena_size + header_size + initial_cap;
+	void *ptr = boa_alloc_ator(ator, total_size);
+	if (!ptr) return NULL;
+
+	boa_arena *arena = (boa_arena*)ptr;
+	boa__arena_page *page = (boa__arena_page*)((char*)arena + arena_size);
+
+	arena->ator = ator;
+	arena->impl.data = page;
+	arena->impl.pos = header_size;
+	arena->impl.cap = initial_cap;
+	page->next = NULL;
+	page->ator = ator;
+
+	return arena;
+}
+
 void *boa__arena_push_page(boa_arena *arena, uint32_t size)
 {
 	uint32_t header_size = boa_align_up(sizeof(boa__arena_page), 8);
@@ -768,5 +791,52 @@ void boa_arena_reset(boa_arena *arena)
 		boa_free_ator(ator, free_ptr);
 	}
 }
+
+// -- boa_error
+
+int boa_error_simple_format(boa_buf *buf, const boa_error *error)
+{
+	return boa_format(buf, "%s %s: %s", error->context, error->type->name, error->type->description);
+}
+
+void *boa_error_push(boa_error **error, const boa_error_type *type, const char *context)
+{
+	boa_assert(type != NULL);
+	boa_assert(type->size > 0);
+
+	if (!error) return NULL;
+	boa_error *err = *error;
+	boa_arena *arena;
+
+	if (err) {
+		arena = err->arena;
+	} else {
+		arena = boa_arena_make(128);
+	}
+
+	if (!arena) return NULL;
+
+	boa_error *next = (boa_error*)boa_arena_push_size(arena, type->size, 8);
+	next->cause = err;
+	next->type = type;
+	next->arena = arena;
+	next->context = context;
+
+	return next;
+}
+
+const boa_error_type boa_err_no_space = {
+	"boa_err_no_space",
+	"Allocator is out of space",
+	&boa_error_simple_format,
+	sizeof(boa_error),
+};
+
+extern const boa_error_type boa_err_external = {
+	"boa_err_external",
+	"External error",
+	&boa_error_simple_format,
+	sizeof(boa_error),
+};
 
 #endif

@@ -5,7 +5,12 @@
 
 #include "boa_unicode.h"
 
-const boa_error boa_err_unicode_conversion = { "Failed to convert Unicode representation" };
+const boa_error boa_err_unicode = {
+	"boa_err_unicode",
+	"Invalid Unicode data",
+	&boa_error_simple_format,
+	sizeof(boa_error),
+};
 
 static uint32_t boa__utf16_size_in_utf8(unsigned word) {
 	if (word < 0x80) return 1;
@@ -19,9 +24,9 @@ static uint32_t boa__utf8_size_in_utf16(unsigned byte) {
 	else return 2;
 }
 
-boa_result boa_convert_utf16_to_utf8(boa_buf *buf, const uint16_t **ptr, const uint16_t *end)
+int boa_convert_utf16_to_utf8(boa_buf *buf, const uint16_t **ptr, const uint16_t *end, boa_error **error)
 {
-	boa_result res = boa_ok;
+	boa_error_type *errtype = NULL;
 	const uint16_t *p = *ptr;
 	uint8_t *dst_ptr = boa_end(uint8_t, buf);
 	uint32_t dst_left = (uint32_t)(boa_cap(uint8_t, buf) - dst_ptr);
@@ -68,8 +73,7 @@ boa_result boa_convert_utf16_to_utf8(boa_buf *buf, const uint16_t **ptr, const u
 				dst_left -= 4;
 				p += 2;
 			} else {
-				// Bad surrogate pair
-				res = &boa_err_unicode_conversion;
+				errtype = &boa_err_unicode;
 				break;
 			}
 		} else {
@@ -81,11 +85,11 @@ boa_result boa_convert_utf16_to_utf8(boa_buf *buf, const uint16_t **ptr, const u
 					dst_ptr = boa_begin(uint8_t, buf) + offset;
 					dst_left = (uint32_t)(boa_cap(uint8_t, buf) - dst_ptr);
 				} else {
-					res = &boa_err_no_space;
+					errtype = &boa_err_no_space;
 					break;
 				}
 			} else {
-				res = &boa_err_unicode_conversion;
+				errtype = &boa_err_unicode;
 				break;
 			}
 		}
@@ -218,6 +222,10 @@ boa_result boa_convert_utf8_to_utf16(boa_buf *buf, const char **ptr, const char 
 
 boa_result boa_convert_utf16_to_utf8_replace(boa_buf *buf, const uint16_t **ptr, const uint16_t *end, const char *replace, uint32_t replace_len)
 {
+	uint64_t errbuf[64];
+	boa_error_buf error;
+	boa_arena_init_buf(error.arena, errbuf, sizeof(errbuf));
+
 	const uint16_t *prev;
 	boa_result res;
 

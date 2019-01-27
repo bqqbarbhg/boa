@@ -5,13 +5,11 @@
 
 #include "boa_core.h"
 
-extern const boa_error boa_err_unicode_conversion;
+int boa_convert_utf16_to_utf8(boa_buf *buf, const uint16_t **ptr, const uint16_t *end, boa_error **error);
+int boa_convert_utf8_to_utf16(boa_buf *buf, const char **ptr, const char *end, boa_error **error);
 
-boa_result boa_convert_utf16_to_utf8(boa_buf *buf, const uint16_t **ptr, const uint16_t *end);
-boa_result boa_convert_utf8_to_utf16(boa_buf *buf, const char **ptr, const char *end);
-
-boa_result boa_convert_utf16_to_utf8_replace(boa_buf *buf, const uint16_t **ptr, const uint16_t *end, const char *replace, uint32_t replace_len);
-boa_result boa_convert_utf8_to_utf16_replace(boa_buf *buf, const char **ptr, const char *end, const uint16_t *replace, uint32_t replace_len);
+int boa_convert_utf16_to_utf8_replace(boa_buf *buf, const uint16_t **ptr, const uint16_t *end, const char *replace, uint32_t replace_len);
+int boa_convert_utf8_to_utf16_replace(boa_buf *buf, const char **ptr, const char *end, const uint16_t *replace, uint32_t replace_len);
 
 extern const uint16_t boa_utf16_replacement_character[1];
 extern const char boa_utf8_replacement_character[3];
